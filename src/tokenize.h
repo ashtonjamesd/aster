@@ -10,6 +10,7 @@ typedef enum {
     TOKEN_SINGLE_EQUALS,
 
     TOKEN_INTEGER,
+    TOKEN_FLOAT,
     TOKEN_IDENTIFIER,
 
     TOKEN_EOF,
@@ -23,8 +24,8 @@ typedef struct {
 
 typedef struct {
     TokenKeyword *data;
-    size_t        count;
-    size_t        capacity;
+    uint8_t       count;
+    uint8_t       capacity;
 } KeywordTable;
 
 typedef struct {
@@ -35,6 +36,7 @@ typedef struct {
 } Token;
 
 typedef struct {
+    char         *filePath;
     char         *source;
     
     uint32_t      position;
@@ -42,15 +44,16 @@ typedef struct {
     uint32_t      column;
 
     Token        *tokens;
-    uint32_t      token_count;
-    uint32_t      token_capacity;
+    uint32_t      tokenCount;
+    uint32_t      tokenCapacity;
 
     KeywordTable *table;
 
     bool          hadErr;
+    bool          debug;
 } Lexer;
 
-Lexer newLexer(char *source);
+Lexer newLexer(char *filePath, char *source, bool debug);
 void  freeLexer(Lexer *lexer);
 
 void  tokenize(Lexer *lexer);

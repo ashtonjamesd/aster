@@ -2,10 +2,17 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <limits.h>
 
 #include "tokenize.h"
+#include "err.h"
 
 static void newKeyword(Lexer *lexer, char *name, TokenType type) {
+    if (lexer->table->count == UCHAR_MAX) {
+        fprintf(stderr, "reached lexer keywords unsigned 8-bit integer limit");
+        exit(1);
+    }
+
     if (lexer->table->count >= lexer->table->capacity) {
         lexer->table->capacity *= 2;
         lexer->table->data = realloc(lexer->table->data, sizeof(TokenKeyword) * lexer->table->capacity);
@@ -28,18 +35,19 @@ static void initKeywords(Lexer *lexer) {
     newKeyword(lexer, "let", TOKEN_LET);
 }
 
-Lexer newLexer(char *source) {
+Lexer newLexer(char *filePath, char *source, bool debug) {
     Lexer lexer;
-    
+
+    lexer.filePath = filePath;
     lexer.source = source;
     
     lexer.position = 0;
     lexer.line = 1;
     lexer.column = 0;
 
-    lexer.token_count = 0;
-    lexer.token_capacity = 1;
-    lexer.tokens = malloc(sizeof(Token) * lexer.token_capacity);
+    lexer.tokenCount = 0;
+    lexer.tokenCapacity = 1;
+    lexer.tokens = malloc(sizeof(Token) * lexer.tokenCapacity);
 
     lexer.table = malloc(sizeof(KeywordTable));
     lexer.table->count = 0;
@@ -48,12 +56,13 @@ Lexer newLexer(char *source) {
     initKeywords(&lexer);
 
     lexer.hadErr = false;
+    lexer.debug = debug;
 
     return lexer;
 }
 
 void freeLexer(Lexer *lexer) {
-    for (uint32_t i = 0; i < lexer->token_count; i++) {
+    for (uint32_t i = 0; i < lexer->tokenCount; i++) {
         free(lexer->tokens[i].lexeme);
     }
 
@@ -98,13 +107,23 @@ static char *copyLexeme(Lexer *lexer, uint32_t start) {
 
 static Token tokenizeNumber(Lexer *lexer) {
     uint32_t start = lexer->position;
-    while (!isEnd(lexer) && isdigit(currentChar(lexer))) {
+
+    bool hasDecimal = false;
+    while (!isEnd(lexer) && (isdigit(currentChar(lexer)) || currentChar(lexer) == '.')) {
+        if (!hasDecimal && currentChar(lexer) == '.') {
+            hasDecimal = true;
+        } else if (currentChar(lexer) == '.') {
+            compileErrFromTokenize(lexer, "invalid numeric format");
+            return badToken(lexer);
+        }
+
         advance(lexer);
     }
 
     char *lexeme = copyLexeme(lexer, start);
-
-    Token token = newToken(lexeme, TOKEN_INTEGER, lexer);
+    
+    TokenType type = hasDecimal ? TOKEN_FLOAT : TOKEN_INTEGER;
+    Token token = newToken(lexeme, type, lexer);
     free(lexeme);
 
     return token;
@@ -119,7 +138,7 @@ static Token tokenizeIdentifier(Lexer *lexer) {
     char *lexeme = copyLexeme(lexer, start);
 
     TokenType type = TOKEN_IDENTIFIER;
-    for (size_t i = 0; i < lexer->table->count; i++) {
+    for (uint8_t i = 0; i < lexer->table->count; i++) {
         if (strcmp(lexeme, lexer->table->data[i].name) == 0) {
             type = lexer->table->data[i].type;
             break;
@@ -150,7 +169,7 @@ static Token tokenizeChar(Lexer *lexer) {
 }
 
 static void printTokens(Lexer *lexer) {
-    for (uint32_t i = 0; i < lexer->token_count; i++) {
+    for (uint32_t i = 0; i < lexer->tokenCount; i++) {
         Token token = lexer->tokens[i];
 
         printf("%s: %d at %d:%d\n", token.lexeme, token.type, token.line, token.column);
@@ -158,12 +177,12 @@ static void printTokens(Lexer *lexer) {
 }
 
 static void addToken(Token token, Lexer *lexer) {
-    if (lexer->token_count >= lexer->token_capacity) {
-        lexer->token_capacity *= 2;
-        lexer->tokens = realloc(lexer->tokens, sizeof(Token) * lexer->token_capacity);
+    if (lexer->tokenCount >= lexer->tokenCapacity) {
+        lexer->tokenCapacity *= 2;
+        lexer->tokens = realloc(lexer->tokens, sizeof(Token) * lexer->tokenCapacity);
     }
 
-    lexer->tokens[lexer->token_count++] = token;
+    lexer->tokens[lexer->tokenCount++] = token;
 }
 
 static void skipWhitespace(Lexer *lexer) {
@@ -183,10 +202,12 @@ void tokenize(Lexer *lexer) {
 
         Token token = tokenizeChar(lexer);
         addToken(token, lexer);
+
+        if (token.type == TOKEN_BAD) break;
     }
 
     addToken(newToken("EOF", TOKEN_EOF, lexer), lexer);
     freeKeywords(lexer->table);
 
-    printTokens(lexer);
+    if (lexer->debug) printTokens(lexer);
 }

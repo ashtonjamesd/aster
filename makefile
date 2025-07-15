@@ -1,5 +1,5 @@
 CC = gcc
-EXEC = a
+EXEC = build/a
 CFLAGS = -Wextra -Wall
 SRCS = $(wildcard src/*.c)
 

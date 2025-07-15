@@ -31,8 +31,17 @@ static inline char *readFile(char *path) {
     return buff;
 }
 
-ExecResult runFromSource(char *source) {
-    Compiler compiler = newCompiler(source);
+ExecResult runFromSource(char *path) {
+    char *source = readFile(path);
+    if (!source) return EXEC_FAIL;
+
+    CompilerConfig config = (CompilerConfig){
+        .lexerDebug = false,
+        .parserDebug = true,
+        .path = path
+    };
+
+    Compiler compiler = newCompiler(source, config);
     ExecResult result = compile(&compiler);
 
     return result;
@@ -79,13 +88,7 @@ ExecResult runCli(int argc, char **argv) {
     }
 
     if (isFile) {
-        char *buff = readFile(path);
-        if (!buff) {
-            free(buff);
-            return EXEC_FAIL;
-        }
-
-        return runFromSource(buff);
+        return runFromSource(path);
     } else if (isRepl) {
         return runRepl();
     }
