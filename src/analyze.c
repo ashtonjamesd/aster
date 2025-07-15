@@ -12,6 +12,14 @@ Analyzer newAnalyzer(Parser *parser) {
     return analyzer;
 }
 
+void analyzeFunctionDeclaration(FunctionDeclaration function) {
+    if (function.name) return;
+}
+
+void analyzeAssignExpr(AssignmentExpr assign) {
+    if (assign.value) return;
+}
+
 void analyzeLet(LetDeclaration let) {
     if (let.value) return;
 }
@@ -22,15 +30,23 @@ void analyzeExpr(AstExpr *expr) {
             analyzeLet(expr->asLet);
             break;
         }
+        case AST_ASSIGN_EXPR: {
+            analyzeAssignExpr(expr->asAssign);
+            break;
+        }
+        case AST_FUNCTION_DECLARATION: {
+            analyzeFunctionDeclaration(expr->asFunction);
+            break;
+        }
         case AST_FLOAT_LITERAL: {}
         case AST_IDENTIFIER: {}
         case AST_INTEGER_LITERAL: {}
         case AST_ERR_EXPR: {
-            fprintf(stderr, "critical: found error expression in analyzer");
+            fprintf(stderr, "critical: found error expression in analyzer\n");
             exit(1);
         }
         default: {
-            fprintf(stderr, "analyzer: unknown expression type in 'analyzeExpr': %d", expr->type);
+            fprintf(stderr, "analyzer: unknown expression type in 'analyzeExpr': %d\n", expr->type);
             exit(1);
         }
     }

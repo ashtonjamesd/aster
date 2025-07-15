@@ -33,6 +33,8 @@ static void freeKeywords(KeywordTable *table) {
 
 static void initKeywords(Lexer *lexer) {
     newKeyword(lexer, "let", TOKEN_LET);
+    newKeyword(lexer, "fn", TOKEN_FN);
+    newKeyword(lexer, "return", TOKEN_RETURN);
 }
 
 Lexer newLexer(char *filePath, char *source, bool debug) {
@@ -131,7 +133,7 @@ static Token tokenizeNumber(Lexer *lexer) {
 
 static Token tokenizeIdentifier(Lexer *lexer) {
     uint32_t start = lexer->position;
-    while (!isEnd(lexer) && isalpha(currentChar(lexer))) {
+    while (!isEnd(lexer) && (isalpha(currentChar(lexer)) || isdigit(currentChar(lexer)))) {
         advance(lexer);
     }
 
@@ -157,6 +159,12 @@ static Token tokenizeSymbol(Lexer *lexer) {
 
     switch (c) {
         case '=': return newToken("=", TOKEN_SINGLE_EQUALS, lexer);
+        case ':': return newToken(":", TOKEN_COLON, lexer);
+        case '*': return newToken("*", TOKEN_STAR, lexer);
+        case '(': return newToken("(", TOKEN_LEFT_PAREN, lexer);
+        case ')': return newToken(")", TOKEN_RIGHT_PAREN, lexer);
+        case '{': return newToken("{", TOKEN_LEFT_BRACE, lexer);
+        case '}': return newToken("}", TOKEN_RIGHT_BRACE, lexer);
         default:  return badToken(lexer);
     }
 }
