@@ -7,15 +7,15 @@
 #include "analyze.h"
 #include "transpile.h"
 
-Compiler newCompiler(char *source, CompilerConfig config) {
-    Compiler compiler;
+AsterCompiler newCompiler(char *source, AsterConfig config) {
+    AsterCompiler compiler;
     compiler.source = source;
     compiler.config = config;
 
     return compiler;
 }
 
-ExecResult compile(Compiler *compiler) {
+ExecResult compileToC(AsterCompiler *compiler) {
     Lexer lexer = newLexer(compiler->config.path, compiler->source, compiler->config.lexerDebug);
     tokenize(&lexer);
 
@@ -43,8 +43,14 @@ ExecResult compile(Compiler *compiler) {
     Analyzer analyzer = newAnalyzer(&parser);
     analyze(&analyzer);
 
-    AsterCTranspiler aster = newTranspiler(parser.ast);
-    transpile(&aster);
+    FILE *fptr = fopen("out.c", "w");
+    if (!fptr) {
+        fprintf(stderr, "unable to open c source output\n");
+        return EXEC_FAIL;
+    }
+
+    Transpiler transpiler = newTranspiler(fptr, parser.ast);
+    transpile(&transpiler);
 
     freeParser(&parser);
     freeLexer(&lexer);

@@ -1,3 +1,11 @@
-fn main(): u0 {
-    return 1
+fn main(): u8 {
+    let x: u8 = 10
+    return x
+}
+
+struct x {
+    a: bool,
+    b: u8,
+    c: u32,
+    d: i64,
 }

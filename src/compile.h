@@ -9,14 +9,14 @@ typedef struct {
     bool  lexerDebug;
     bool  parserDebug;
     char *path;
-} CompilerConfig;
+} AsterConfig;
 
 typedef struct {
     char          *source;
-    CompilerConfig config;
-} Compiler;
+    AsterConfig config;
+} AsterCompiler;
 
-Compiler newCompiler(char *source, CompilerConfig config);
-ExecResult compile(Compiler *compiler);
+AsterCompiler newCompiler(char *source, AsterConfig config);
+ExecResult compileToC(AsterCompiler *compiler);
 
 #endif

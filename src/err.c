@@ -1,9 +1,11 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "err.h"
 #include "parse.h"
 #include "tokenize.h"
+#include "analyze.h"
 
 void compileErrFromParse(Parser *parser, char *message) {
     parser->hadErr = true;
@@ -26,7 +28,7 @@ void compileErrFromParse(Parser *parser, char *message) {
 
             while (parser->tokens[i++].line == errToken.line);
 
-            endIndex = i;
+            endIndex = i - 1;
             break;
         }
     }
@@ -35,9 +37,10 @@ void compileErrFromParse(Parser *parser, char *message) {
     for (int i = startIndex; i < endIndex; i++) {
         if (parser->tokens[i].type == TOKEN_EOF) break;
 
-        printf("%s ", parser->tokens[i].lexeme);
+        if (parser->tokens[i].hadLeadingWhitespace) printf(" ");
+        printf("%s", parser->tokens[i].lexeme);
     }
-    printf("\n");
+    printf("\n\n");
 }
 
 void compileErrFromTokenize(Lexer *lexer, char *message) {
@@ -61,4 +64,18 @@ void compileErrFromTokenize(Lexer *lexer, char *message) {
         putchar(lexer->source[i]);
     }
     printf("\n\n");
+}
+
+void compileErrFromAnalyzer(Analyzer *analyzer, char *message) {
+    analyzer->hadErr = true;
+
+    printf("\n");
+    printf("in %s\n", analyzer->parser->filePath);
+    printf("%s", message);
+    printf("\n");
+}
+
+void exitWithInternalCompilerError(char *err) {
+    fprintf(stderr, "\ninternal compiler error: %s\n\n", err);
+    exit(1);
 }

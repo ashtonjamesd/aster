@@ -8,6 +8,8 @@ typedef enum {
     TOKEN_LET,
     TOKEN_FN,
     TOKEN_RETURN,
+    TOKEN_STRUCT,
+    TOKEN_INTERFACE,
 
     TOKEN_SINGLE_EQUALS,
     TOKEN_COLON,
@@ -16,9 +18,12 @@ typedef enum {
     TOKEN_RIGHT_PAREN,
     TOKEN_LEFT_BRACE,
     TOKEN_RIGHT_BRACE,
+    TOKEN_COMMA,
 
     TOKEN_INTEGER,
     TOKEN_FLOAT,
+    TOKEN_CHAR,
+    TOKEN_STRING,
     TOKEN_IDENTIFIER,
 
     TOKEN_EOF,
@@ -39,14 +44,18 @@ typedef struct {
 typedef struct {
     char      *lexeme;
     TokenType  type;
+    
     uint32_t   line;
     uint32_t   column;
+
+    bool       hadLeadingWhitespace;
 } Token;
 
 typedef struct {
     char         *filePath;
     char         *source;
-    
+    uint32_t      sourceLength;
+
     uint32_t      position;
     uint32_t      line;
     uint32_t      column;
@@ -59,6 +68,8 @@ typedef struct {
 
     bool          hadErr;
     bool          debug;
+
+    bool          hadLeadingWhitespace;
 } Lexer;
 
 Lexer newLexer(char *filePath, char *source, bool debug);

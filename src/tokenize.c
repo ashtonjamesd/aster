@@ -7,15 +7,20 @@
 #include "tokenize.h"
 #include "err.h"
 
-static void newKeyword(Lexer *lexer, char *name, TokenType type) {
-    if (lexer->table->count == UCHAR_MAX) {
-        fprintf(stderr, "reached lexer keywords unsigned 8-bit integer limit");
-        exit(1);
+#define MAX_KEYWORDS UCHAR_MAX
+
+static void newKeyword(Lexer *l, char *name, TokenType type) {
+    if (l->table->count == MAX_KEYWORDS) {
+        exitWithInternalCompilerError("keywords limit reached");
     }
 
-    if (lexer->table->count >= lexer->table->capacity) {
-        lexer->table->capacity *= 2;
-        lexer->table->data = realloc(lexer->table->data, sizeof(TokenKeyword) * lexer->table->capacity);
+    if (l->table->count >= l->table->capacity) {
+        l->table->capacity *= 2;
+        l->table->data = realloc(l->table->data, sizeof(TokenKeyword) * l->table->capacity);
+        
+        if (!l->table->data) {
+            exitWithInternalCompilerError("failed to realloc keyword table");
+        }
     }
 
     TokenKeyword keyword = {
@@ -23,7 +28,7 @@ static void newKeyword(Lexer *lexer, char *name, TokenType type) {
         .type = type,
     };
 
-    lexer->table->data[lexer->table->count++] = keyword;
+    l->table->data[l->table->count++] = keyword;
 }
 
 static void freeKeywords(KeywordTable *table) {
@@ -31,191 +36,261 @@ static void freeKeywords(KeywordTable *table) {
     free(table);
 }
 
-static void initKeywords(Lexer *lexer) {
-    newKeyword(lexer, "let", TOKEN_LET);
-    newKeyword(lexer, "fn", TOKEN_FN);
-    newKeyword(lexer, "return", TOKEN_RETURN);
+static void initKeywords(Lexer *l) {
+    newKeyword(l, "let", TOKEN_LET);
+    newKeyword(l, "fn", TOKEN_FN);
+    newKeyword(l, "return", TOKEN_RETURN);
+    newKeyword(l, "struct", TOKEN_STRUCT);
+    newKeyword(l, "interface", TOKEN_INTERFACE);
 }
 
 Lexer newLexer(char *filePath, char *source, bool debug) {
-    Lexer lexer;
+    Lexer l;
 
-    lexer.filePath = filePath;
-    lexer.source = source;
+    l.filePath = filePath;
+    l.source = source;
     
-    lexer.position = 0;
-    lexer.line = 1;
-    lexer.column = 0;
+    l.position = 0;
+    l.line = 1;
+    l.column = 0;
 
-    lexer.tokenCount = 0;
-    lexer.tokenCapacity = 1;
-    lexer.tokens = malloc(sizeof(Token) * lexer.tokenCapacity);
+    l.tokenCount = 0;
+    l.tokenCapacity = 1;
+    l.tokens = malloc(sizeof(Token) * l.tokenCapacity);
 
-    lexer.table = malloc(sizeof(KeywordTable));
-    lexer.table->count = 0;
-    lexer.table->capacity = 1;
-    lexer.table->data = malloc(sizeof(TokenKeyword));
-    initKeywords(&lexer);
+    l.table = malloc(sizeof(KeywordTable));
+    l.table->count = 0;
+    l.table->capacity = 1;
+    l.table->data = malloc(sizeof(TokenKeyword));
+    initKeywords(&l);
 
-    lexer.hadErr = false;
-    lexer.debug = debug;
+    l.hadErr = false;
+    l.debug = debug;
+    l.hadLeadingWhitespace = true;
 
-    return lexer;
+    return l;
 }
 
-void freeLexer(Lexer *lexer) {
-    for (uint32_t i = 0; i < lexer->tokenCount; i++) {
-        free(lexer->tokens[i].lexeme);
+void freeLexer(Lexer *l) {
+    for (uint32_t i = 0; i < l->tokenCount; i++) {
+        free(l->tokens[i].lexeme);
     }
 
-    free(lexer->tokens);
+    free(l->tokens);
 }
 
-static bool isEnd(Lexer *lexer) {
-    return lexer->position >= (uint32_t)strlen(lexer->source);
+static inline bool isEnd(Lexer *l) {
+    return l->position >= l->sourceLength;
 }
 
-static void advance(Lexer *lexer) {
-    lexer->position++;
-    lexer->column++;
+static inline void advance(Lexer *l) {
+    l->position++;
+    l->column++;
 }
 
-static char currentChar(Lexer *lexer) {
-    return lexer->source[lexer->position];
+static inline char currentChar(Lexer *l) {
+    return isEnd(l) ? '\0' : l->source[l->position];
 }
 
-static Token newToken(char *lexeme, TokenType type, Lexer *lexer) {
+static inline bool shouldPeek(Lexer *l, bool (*predicate)(char)) {
+    return !isEnd(l) && predicate(currentChar(l));
+}
+
+static Token newToken(char *lexeme, TokenType type, Lexer *l) {
     Token token;
     token.lexeme = strdup(lexeme);
     token.type = type;
-    token.column = lexer->column;
-    token.line = lexer->line;
+    token.column = l->column;
+    token.line = l->line;
+    token.hadLeadingWhitespace = l->hadLeadingWhitespace;
 
     return token;
 }
 
-static inline Token badToken(Lexer *lexer) {
-    return newToken("BAD", TOKEN_BAD, lexer);
+static inline Token badToken(Lexer *l) {
+    return newToken("BAD", TOKEN_BAD, l);
 }
 
-static char *copyLexeme(Lexer *lexer, uint32_t start) {
-    uint32_t length = lexer->position - start;
+static char *copyLexeme(Lexer *l, uint32_t start) {
+    uint32_t length = l->position - start;
     char *lexeme = malloc(length + 1);
-    strncpy(lexeme, lexer->source + start, length);
+    strncpy(lexeme, l->source + start, length);
     lexeme[length] = '\0';
 
     return lexeme;
 }
 
-static Token tokenizeNumber(Lexer *lexer) {
-    uint32_t start = lexer->position;
+static inline bool tokenizeNumberPredicate(char c) {
+    return isdigit(c) || c == '.';
+}
+
+static Token tokenizeNumber(Lexer *l) {
+    uint32_t start = l->position;
 
     bool hasDecimal = false;
-    while (!isEnd(lexer) && (isdigit(currentChar(lexer)) || currentChar(lexer) == '.')) {
-        if (!hasDecimal && currentChar(lexer) == '.') {
+    while (shouldPeek(l, tokenizeNumberPredicate)) {
+        if (!hasDecimal && currentChar(l) == '.') {
             hasDecimal = true;
-        } else if (currentChar(lexer) == '.') {
-            compileErrFromTokenize(lexer, "invalid numeric format");
-            return badToken(lexer);
+        } else if (currentChar(l) == '.') {
+            compileErrFromTokenize(l, "invalid numeric format");
+            return badToken(l);
         }
 
-        advance(lexer);
+        advance(l);
     }
 
-    char *lexeme = copyLexeme(lexer, start);
+    char *lexeme = copyLexeme(l, start);
     
     TokenType type = hasDecimal ? TOKEN_FLOAT : TOKEN_INTEGER;
-    Token token = newToken(lexeme, type, lexer);
+    Token token = newToken(lexeme, type, l);
     free(lexeme);
 
     return token;
 }
 
-static Token tokenizeIdentifier(Lexer *lexer) {
-    uint32_t start = lexer->position;
-    while (!isEnd(lexer) && (isalpha(currentChar(lexer)) || isdigit(currentChar(lexer)))) {
-        advance(lexer);
+static inline bool identifierPredicate(char c) {
+    return isalpha(c) || isdigit(c) || c == '_';
+}
+
+static Token tokenizeIdentifier(Lexer *l) {
+    uint32_t start = l->position;
+    while (shouldPeek(l, identifierPredicate)) {
+        advance(l);
     }
 
-    char *lexeme = copyLexeme(lexer, start);
+    char *lexeme = copyLexeme(l, start);
 
     TokenType type = TOKEN_IDENTIFIER;
-    for (uint8_t i = 0; i < lexer->table->count; i++) {
-        if (strcmp(lexeme, lexer->table->data[i].name) == 0) {
-            type = lexer->table->data[i].type;
+    for (uint8_t i = 0; i < l->table->count; i++) {
+        if (strcmp(lexeme, l->table->data[i].name) == 0) {
+            type = l->table->data[i].type;
             break;
         }
     }
 
-    Token token = newToken(lexeme, type, lexer);
+    Token token = newToken(lexeme, type, l);
     free(lexeme);
 
     return token;
 }
 
-static Token tokenizeSymbol(Lexer *lexer) {
-    char c = currentChar(lexer);
-    advance(lexer);
+static Token tokenizeSymbol(Lexer *l) {
+    char c = currentChar(l);
+    advance(l);
 
     switch (c) {
-        case '=': return newToken("=", TOKEN_SINGLE_EQUALS, lexer);
-        case ':': return newToken(":", TOKEN_COLON, lexer);
-        case '*': return newToken("*", TOKEN_STAR, lexer);
-        case '(': return newToken("(", TOKEN_LEFT_PAREN, lexer);
-        case ')': return newToken(")", TOKEN_RIGHT_PAREN, lexer);
-        case '{': return newToken("{", TOKEN_LEFT_BRACE, lexer);
-        case '}': return newToken("}", TOKEN_RIGHT_BRACE, lexer);
-        default:  return badToken(lexer);
+        case '=': return newToken("=", TOKEN_SINGLE_EQUALS, l);
+        case ':': return newToken(":", TOKEN_COLON, l);
+        case '*': return newToken("*", TOKEN_STAR, l);
+        case '(': return newToken("(", TOKEN_LEFT_PAREN, l);
+        case ')': return newToken(")", TOKEN_RIGHT_PAREN, l);
+        case '{': return newToken("{", TOKEN_LEFT_BRACE, l);
+        case '}': return newToken("}", TOKEN_RIGHT_BRACE, l);
+        case ',': return newToken(",", TOKEN_COMMA, l);
+        default:  return badToken(l);
     }
 }
 
-static Token tokenizeChar(Lexer *lexer) {
-    if (isdigit(currentChar(lexer))) return tokenizeNumber(lexer);
-    if (isalpha(currentChar(lexer))) return tokenizeIdentifier(lexer);
-
-    return tokenizeSymbol(lexer);
+static inline bool tokenizeStringPredicate(char c) {
+    return c != '\"';
 }
 
-static void printTokens(Lexer *lexer) {
-    for (uint32_t i = 0; i < lexer->tokenCount; i++) {
-        Token token = lexer->tokens[i];
+static Token tokenizeString(Lexer *l) {
+    advance(l);
+    
+    int start = l->position;
+    while (shouldPeek(l, tokenizeStringPredicate)) {
+        advance(l);
+    }
+
+    if (isEnd(l)) {
+        compileErrFromTokenize(l, "unterminated string literal");
+        return badToken(l);
+    }
+
+    char *lexeme = copyLexeme(l, start);
+    advance(l);
+
+    return newToken(lexeme, TOKEN_STRING, l);
+}
+
+static inline bool tokenizeCharPredicate(char c) {
+    return c != '\'';
+}
+
+static Token tokenizeChar(Lexer *l) {
+    advance(l);
+
+    int start = l->position;
+    while (shouldPeek(l, tokenizeCharPredicate)) {
+        advance(l);
+    }
+    char *lexeme = copyLexeme(l, start);
+    advance(l);
+
+    return newToken(lexeme, TOKEN_CHAR, l);
+}
+
+static Token tokenizeNext(Lexer *l) {
+    if (isdigit(currentChar(l))) return tokenizeNumber(l);
+    else if (isalpha(currentChar(l))) return tokenizeIdentifier(l);
+    else if (currentChar(l) == '\"') return tokenizeString(l);
+    else if (currentChar(l) == '\'') return tokenizeChar(l);
+
+    return tokenizeSymbol(l);
+}
+
+static void printTokens(Lexer *l) {
+    for (uint32_t i = 0; i < l->tokenCount; i++) {
+        Token token = l->tokens[i];
 
         printf("%s: %d at %d:%d\n", token.lexeme, token.type, token.line, token.column);
     }
 }
 
-static void addToken(Token token, Lexer *lexer) {
-    if (lexer->tokenCount >= lexer->tokenCapacity) {
-        lexer->tokenCapacity *= 2;
-        lexer->tokens = realloc(lexer->tokens, sizeof(Token) * lexer->tokenCapacity);
-    }
-
-    lexer->tokens[lexer->tokenCount++] = token;
-}
-
-static void skipWhitespace(Lexer *lexer) {
-    while (isspace(currentChar(lexer))) {
-        if (currentChar(lexer) == '\n') {
-            lexer->line++;
-            lexer->column = 0;
+static void addToken(Token token, Lexer *l) {
+    if (l->tokenCount >= l->tokenCapacity) {
+        l->tokenCapacity *= 2;
+        l->tokens = realloc(l->tokens, sizeof(Token) * l->tokenCapacity);
+        
+        if (!l->table->data) {
+            exitWithInternalCompilerError("failed to reallocate tokens pointer");
         }
-        advance(lexer);
+    }
+
+    l->tokens[l->tokenCount++] = token;
+}
+
+static void skipWhitespace(Lexer *l) {
+    l->hadLeadingWhitespace = false;
+
+    while (isspace(currentChar(l))) {
+        l->hadLeadingWhitespace = true;
+        
+        if (currentChar(l) == '\n') {
+            l->line++;
+            l->column = 0;
+        }
+
+        advance(l);
     }
 }
 
-void tokenize(Lexer *lexer) {
-    while (!isEnd(lexer)) {
-        skipWhitespace(lexer);
-        if (isEnd(lexer)) break;
+void tokenize(Lexer *l) {
+    l->sourceLength = strlen(l->source);
 
-        Token token = tokenizeChar(lexer);
-        addToken(token, lexer);
+    while (!isEnd(l)) {
+        skipWhitespace(l);
+        if (isEnd(l)) break;
+
+        Token token = tokenizeNext(l);
+        addToken(token, l);
 
         if (token.type == TOKEN_BAD) break;
     }
 
-    addToken(newToken("EOF", TOKEN_EOF, lexer), lexer);
-    freeKeywords(lexer->table);
+    addToken(newToken("EOF", TOKEN_EOF, l), l);
+    freeKeywords(l->table);
 
-    if (lexer->debug) printTokens(lexer);
+    if (l->debug) printTokens(l);
 }

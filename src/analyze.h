@@ -7,7 +7,7 @@
 typedef struct {
     bool hadErr;
 
-    Ast  ast;
+    Parser *parser;
 } Analyzer;
 
 

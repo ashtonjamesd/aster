@@ -4,10 +4,11 @@
 #include "parse.h"
 
 typedef struct {
-    Ast ast;
-} AsterCTranspiler;
+    Ast   ast;
+    FILE *fptr;
+} Transpiler;
 
-AsterCTranspiler newTranspiler(Ast ast);
-void transpile(AsterCTranspiler *transpiler);
+Transpiler newTranspiler(FILE *fptr, Ast ast);
+void transpile(Transpiler *transpiler);
 
 #endif

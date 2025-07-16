@@ -1,12 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "analyze.h"
+#include "err.h"
 
 Analyzer newAnalyzer(Parser *parser) {
     Analyzer analyzer;
 
-    analyzer.ast = parser->ast;
+    analyzer.parser = parser;
     analyzer.hadErr = false;
 
     return analyzer;
@@ -38,22 +40,59 @@ void analyzeExpr(AstExpr *expr) {
             analyzeFunctionDeclaration(expr->asFunction);
             break;
         }
-        case AST_FLOAT_LITERAL: {}
-        case AST_IDENTIFIER: {}
-        case AST_INTEGER_LITERAL: {}
+        case AST_STRUCT_DECLARATION: {
+            break;
+        }
+        case AST_FLOAT_LITERAL: {
+            break;
+        }
+        case AST_IDENTIFIER: {
+            break;
+        }
+        case AST_INTEGER_LITERAL: {
+            break;
+        }
+        case AST_STRING_LITERAL: {
+            break;
+        }
+        case AST_CHAR_LITERAL: {
+            break;
+        }
         case AST_ERR_EXPR: {
-            fprintf(stderr, "critical: found error expression in analyzer\n");
-            exit(1);
+            exitWithInternalCompilerError("found error expression in analyzer");
+            break;
         }
         default: {
-            fprintf(stderr, "analyzer: unknown expression type in 'analyzeExpr': %d\n", expr->type);
-            exit(1);
+            exitWithInternalCompilerError("unknown expression type in 'analyzeExpr'");
         }
     }
 }
 
+void raiseNoEntryPointErr(Analyzer *analyzer) {
+    compileErrFromAnalyzer(analyzer, "program requires an entry point 'main' defined\n");
+}
+
 void analyze(Analyzer *analyzer) {
-    for (int i = 0; i < analyzer->ast.exprCount; i++) {
-        analyzeExpr(analyzer->ast.exprs[i]);
+    if (analyzer->parser->ast.exprCount == 0) {
+        raiseNoEntryPointErr(analyzer);
+        return;
+    }
+
+    bool hasEntryPoint = false;
+    for (int i = 0; i < analyzer->parser->ast.exprCount; i++) {
+        AstExpr *expr = analyzer->parser->ast.exprs[i];
+
+        if (!hasEntryPoint && expr->type == AST_FUNCTION_DECLARATION) {
+            if (strcmp(expr->asFunction.name, "main") == 0) {
+                hasEntryPoint = true;
+            }
+        }
+
+        analyzeExpr(expr);
+    }
+
+    if (!hasEntryPoint) {
+        raiseNoEntryPointErr(analyzer);
+        return;
     }
 }

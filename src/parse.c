@@ -40,6 +40,12 @@ static void freeExpr(AstExpr *expr) {
         case AST_IDENTIFIER:
             free(expr->asIdentifer.name);
             break;
+        case AST_STRING_LITERAL:
+            free(expr->asString.value);
+            break;
+        case AST_CHAR_LITERAL:
+            free(expr->asChar.value);
+            break;
         case AST_LET:
             free(expr->asLet.name);
             freeExpr(expr->asLet.value);
@@ -57,13 +63,24 @@ static void freeExpr(AstExpr *expr) {
             for (int i = 0; i < expr->asFunction.block.count; i++) {
                 freeExpr(expr->asFunction.block.body[i]);
             }
+            for (int i = 0; i < expr->asFunction.paramCount; i++) {
+                free(expr->asFunction.parameters[i].name);
+                free(expr->asFunction.parameters[i].type.name);
+            }
             break;
+        case AST_STRUCT_DECLARATION: {
+            free(expr->asStruct.name);
+            for (int i = 0; i < expr->asStruct.fieldCount; i++) {
+                free(expr->asStruct.fields[i].name);
+                free(expr->asStruct.fields[i].type.name);
+            }
+            break;
+        }
         case AST_RETURN:
             freeExpr(expr->asReturn.value);
             break;
         default: {
-            fprintf(stderr, "parse: unknown AST expression type in 'freeExpr': %d\n", expr->type);
-            exit(1);
+            exitWithInternalCompilerError("unknown AST expression type in 'freeExpr'");
         }
     }
 
@@ -92,6 +109,14 @@ static void printExpr(AstExpr expr, int indent) {
         }
         case AST_FLOAT_LITERAL: {
             printf("float literal: %f\n", expr.asFloat.value);
+            break;
+        }
+        case AST_STRING_LITERAL: {
+            printf("string literal: \"%s\"\n", expr.asString.value);
+            break;
+        }
+        case AST_CHAR_LITERAL: {
+            printf("char literal: '%s'\n", expr.asChar.value);
             break;
         }
         case AST_IDENTIFIER: {
@@ -137,7 +162,22 @@ static void printExpr(AstExpr expr, int indent) {
             printf("name: %s\n", expr.asFunction.name);
 
             printIndent(indent + 2);
-            printf("type: %s\n", expr.asFunction.returnType.name);
+            printf("type: ");
+            for (int i = 0; i < expr.asFunction.returnType.ptrDepth; i++) printf("*");
+            printf("%s\n", expr.asFunction.returnType.name);
+
+            printIndent(indent + 2);
+            printf("parameters (%d):\n", expr.asFunction.paramCount);
+            for (int i = 0; i < expr.asFunction.paramCount; i++) {
+                FunctionParameter param = expr.asFunction.parameters[i];
+
+                printIndent(indent + 4);
+                printf("name: %s\n", param.name);
+                printIndent(indent + 4);
+                printf("type: ");
+                for (int i = 0; i < param.type.ptrDepth; i++) printf("*");
+                printf("%s\n", param.type.name);
+            }
             
             printIndent(indent + 2);
             printf("body (%d):\n", expr.asFunction.block.count);
@@ -156,9 +196,30 @@ static void printExpr(AstExpr expr, int indent) {
             printExpr(*expr.asReturn.value, indent);
             break;
         }
+        case AST_STRUCT_DECLARATION: {
+            printf("struct declaration:\n");
+
+            printIndent(indent + 2);
+            printf("name: %s\n", expr.asStruct.name);
+
+            printIndent(indent + 2);
+            printf("interface: %s\n", expr.asStruct.isInterface ? "true" : "false");
+
+            printIndent(indent + 2);
+            printf("fields (%d):\n", expr.asStruct.fieldCount);
+            for (int i = 0; i < expr.asStruct.fieldCount; i++) {
+                printIndent(indent + 4);
+                printf("name: ");
+                printf("%s\n", expr.asStruct.fields[i].name);
+                printIndent(indent + 4);
+                printf("type: ");
+                for (int i = 0; i < expr.asStruct.fields[i].type.ptrDepth; i++) printf("*");
+                printf("%s\n", expr.asStruct.fields[i].type.name);
+            }
+            break;
+        }
         default: {
-            fprintf(stderr, "parse: unknown ast expression type in 'printExpr': %d\n", expr.type);
-            exit(1);
+            exitWithInternalCompilerError("unknown ast expression type in 'printExpr'");
         }
     }
 }
@@ -180,6 +241,10 @@ static inline bool match(Parser *p, TokenType type) {
 
 static inline void advance(Parser *p) {
     p->position++;
+}
+
+static inline void recede(Parser *p) {
+    p->position--;
 }
 
 static inline bool isErr(AstExpr *expr) {
@@ -214,7 +279,13 @@ static AstExpr *parsePrimary(Parser *p) {
             return newFloatExpr(atof(token.lexeme));
         }
         case TOKEN_IDENTIFIER: {
-            return newIdentifierExpr(strdup(token.lexeme));
+            return newIdentifierExpr(token.lexeme);
+        }
+        case TOKEN_CHAR: {
+            return newCharExpr(token.lexeme);
+        }
+        case TOKEN_STRING: {
+            return newStringExpr(token.lexeme);
         }
         default: {
             compileErrFromParse(p, "expected expression");
@@ -290,7 +361,7 @@ static AstExpr *parseAssignment(Parser *p) {
     advance(p);
 
     if (!expect(p, TOKEN_SINGLE_EQUALS)) {
-        return error(p, "expected '='");
+        return error(p, "expected '=' after identifier");
     }
 
     AstExpr *value = parseExpr(p);
@@ -331,12 +402,45 @@ static AstExpr *parseFunction(Parser *p) {
         return error(p, "expected '('");
     }
 
+    FunctionParameter *parameters = malloc(sizeof(FunctionParameter *));
+    int paramCount = 0;
+    int paramCapacity = 1;  
+
+    if (!match(p, TOKEN_RIGHT_PAREN)) {
+        recede(p);
+        
+        do {
+            advance(p);
+
+            Token name = currentToken(p);
+            if (!expect(p, TOKEN_IDENTIFIER)) {
+                return error(p, "expected identifier");
+            }
+
+            if (!expect(p, TOKEN_COLON)) {
+                return error(p, "expected ':' and then a type declaration");
+            }
+
+            AstExpr *type = parseType(p);
+            if (isErr(type)) return type;
+
+            AstExpr *parameter = newFunctionParameter(name.lexeme, type);
+
+            if (paramCount >= paramCapacity) {
+                paramCapacity *= 2;
+                parameters = realloc(parameters, sizeof(FunctionParameter) * paramCapacity);
+            }
+            parameters[paramCount++] = parameter->asParameter;
+
+        } while (match(p, TOKEN_COMMA));
+    }
+
     if (!expect(p, TOKEN_RIGHT_PAREN)) {
         return error(p, "expected ')'");
     }
 
     if (!expect(p, TOKEN_COLON)) {
-        return error(p, "expected ':' and then a type specifier");
+        return error(p, "function return types must be specified, expected ':' and then a type specifier after ')'");
     }
 
     AstExpr *returnType = parseType(p);
@@ -353,7 +457,7 @@ static AstExpr *parseFunction(Parser *p) {
         return error(p, "expected '}'");
     }
 
-    return newFunctionDeclaration(name.lexeme, returnType, body);
+    return newFunctionDeclaration(name.lexeme, returnType, body, paramCount, paramCapacity, parameters);
 }
 
 static AstExpr *parseReturn(Parser *p) {
@@ -365,18 +469,113 @@ static AstExpr *parseReturn(Parser *p) {
     return newReturnStatement(value);
 }
 
-static AstExpr *parseStatement(Parser *p) {
-    if (match(p, TOKEN_LET)) {
-        return parseLet(p);
-    } else if (match(p, TOKEN_IDENTIFIER)) {
-        return parseAssignment(p);
-    } else if (match(p, TOKEN_FN)) {
-        return parseFunction(p);
-    } else if (match(p, TOKEN_RETURN)) {
-        return parseReturn(p);
+static AstExpr *parseStruct(Parser *p) {
+    bool isInterface = false;
+
+    if (match(p, TOKEN_INTERFACE)) {
+        advance(p);
+        isInterface = true;
+    }
+    advance(p);
+
+    Token name = currentToken(p);
+    if (!expect(p, TOKEN_IDENTIFIER)) {
+        return error(p, "expected identifier after 'struct'");
     }
 
-    return parseExpr(p);
+    if (!expect(p, TOKEN_LEFT_BRACE)) {
+        return error(p, "expected '{'");
+    }
+
+    StructField *fields = malloc(sizeof(StructField));
+    int fieldCount = 0;
+    int fieldCapacity = 1;
+
+    if (!match(p, TOKEN_RIGHT_BRACE)) {
+        recede(p);
+        do {
+            // handles leading commas
+            if (match(p, TOKEN_COMMA)) {
+                advance(p);
+                if (match(p, TOKEN_RIGHT_BRACE)) {
+                    break;
+                } else {
+                    recede(p);
+                }
+            }
+
+            advance(p);
+
+            Token fieldName = currentToken(p);
+            if (!expect(p, TOKEN_IDENTIFIER)) {
+                return error(p, "expected identifier");
+            }
+
+            if (!expect(p, TOKEN_COLON)) {
+                return error(p, "expected ':'");
+            }
+
+            AstExpr *type = parseType(p);
+            if (isErr(type)) return type;
+
+            AstExpr *field = newStructField(fieldName.lexeme, type);
+
+            if (fieldCount >= fieldCapacity) {
+                fieldCapacity *= 2;
+                fields = realloc(fields, sizeof(StructField) * fieldCapacity);
+            }
+            
+            fields[fieldCount++] = field->asStructField;
+
+        } while (match(p, TOKEN_COMMA));
+    }
+
+    if (!expect(p, TOKEN_RIGHT_BRACE)) {
+        return error(p, "expected '}'");
+    }
+
+    return newStructDeclaration(name.lexeme, fields, fieldCount, fieldCapacity, isInterface);
+}
+
+static AstExpr *parseInterface(Parser *p) {
+    advance(p);
+
+    if (match(p, TOKEN_STRUCT)) {
+        recede(p);
+        
+        return parseStruct(p);
+    }
+
+    return error(p, "expected 'struct' declaration after 'interface'");
+}
+
+
+static AstExpr *parseStatement(Parser *p) {
+    Token token = currentToken(p);
+
+    switch (token.type) {
+        case TOKEN_LET: {
+            return parseLet(p);
+        }
+        case TOKEN_IDENTIFIER: {
+            return parseAssignment(p);
+        }
+        case TOKEN_FN: {
+            return parseFunction(p);
+        }
+        case TOKEN_RETURN: {
+            return parseReturn(p);
+        }
+        case TOKEN_STRUCT: {
+            return parseStruct(p);
+        }
+        case TOKEN_INTERFACE: {
+            return parseInterface(p);
+        }
+        default: {
+            return parseExpr(p);
+        }
+    }
 }
 
 void addExpr(AstExpr *expr, Parser *p) {

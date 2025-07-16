@@ -35,14 +35,14 @@ ExecResult runFromSource(char *path) {
     char *source = readFile(path);
     if (!source) return EXEC_FAIL;
 
-    CompilerConfig config = (CompilerConfig){
+    AsterConfig config = {
         .lexerDebug = false,
         .parserDebug = true,
         .path = path
     };
 
-    Compiler compiler = newCompiler(source, config);
-    ExecResult result = compile(&compiler);
+    AsterCompiler aster = newCompiler(source, config);
+    ExecResult result = compileToC(&aster);
 
     return result;
 }
