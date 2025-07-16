@@ -5,8 +5,10 @@
 #include "parse.h"
 #include "err.h"
 #include "expr.h"
+#include "map.h"
 
 static AstExpr *parseStatement(Parser *p);
+static AstExpr *parseExpr(Parser *p);
 
 Parser newParser(char *filePath, Token *tokens, int tokenCount, bool debug) {
     Parser p;
@@ -31,33 +33,67 @@ Parser newParser(char *filePath, Token *tokens, int tokenCount, bool debug) {
 
 static void freeExpr(AstExpr *expr) {
     switch (expr->type) {
-        case AST_INTEGER_LITERAL:
+        case AST_NEXT: {
             break;
-        case AST_FLOAT_LITERAL:
+        }
+        case AST_STOP: {
             break;
-        case AST_ERR_EXPR:
+        }
+        case AST_INTEGER_LITERAL: {
             break;
-        case AST_IDENTIFIER:
-            free(expr->asIdentifer.name);
+        }
+        case AST_FLOAT_LITERAL: {
             break;
-        case AST_STRING_LITERAL:
+        }
+        case AST_ERR_EXPR: {
+            break;
+        }
+        case AST_BOOL_LITERAL: {
+            break;
+        }
+        case AST_CALL_EXPR: {
+            for (int i = 0; i < expr->asCallExpr.argCount; i++) {
+                freeExpr(expr->asCallExpr.arguments[i]);
+            }
+            free(expr->asCallExpr.name);
+            break;
+        }
+        case AST_IDENTIFIER: {
+            free(expr->asIdentifier.name);
+            break;
+        }
+        case AST_STRING_LITERAL: {
             free(expr->asString.value);
             break;
-        case AST_CHAR_LITERAL:
+        }
+        case AST_CHAR_LITERAL: {
             free(expr->asChar.value);
             break;
-        case AST_LET:
+        }
+        case AST_LET: {
             free(expr->asLet.name);
             freeExpr(expr->asLet.value);
             break;
-        case AST_TYPE_EXPR:
+        }
+        case AST_TYPE_EXPR: {
             free(expr->asType.name);
             break;
-        case AST_ASSIGN_EXPR:
+        }
+        case AST_ASSIGN_EXPR: {
             free(expr->asAssign.name);    
             freeExpr(expr->asAssign.value);
             break;
-        case AST_FUNCTION_DECLARATION:
+        }
+        case AST_UNARY: {
+            freeExpr(expr->asUnary.right);
+            break;
+        }
+        case AST_BINARY: {
+            freeExpr(expr->asBinary.left);
+            freeExpr(expr->asBinary.right);
+            break;
+        }
+        case AST_FUNCTION_DECLARATION: {
             free(expr->asFunction.name);
             free(expr->asFunction.returnType.name);
             for (int i = 0; i < expr->asFunction.block.count; i++) {
@@ -68,6 +104,7 @@ static void freeExpr(AstExpr *expr) {
                 free(expr->asFunction.parameters[i].type.name);
             }
             break;
+        }
         case AST_STRUCT_DECLARATION: {
             free(expr->asStruct.name);
             for (int i = 0; i < expr->asStruct.fieldCount; i++) {
@@ -76,9 +113,17 @@ static void freeExpr(AstExpr *expr) {
             }
             break;
         }
-        case AST_RETURN:
+        case AST_RETURN: {
             freeExpr(expr->asReturn.value);
             break;
+        }
+        case AST_WHILE: {
+            freeExpr(expr->asWhile.condition);
+            for (int i = 0; i < expr->asWhile.block.count; i++) {
+                freeExpr(expr->asWhile.block.body[i]);
+            }
+            break;
+        }
         default: {
             exitWithInternalCompilerError("unknown AST expression type in 'freeExpr'");
         }
@@ -107,6 +152,10 @@ static void printExpr(AstExpr expr, int indent) {
             printf("integer literal: %d\n", expr.asInteger.value);
             break;
         }
+        case AST_BOOL_LITERAL: {
+            printf("bool literal: %s\n", expr.asBool.value ? "true" : "false");
+            break;
+        }
         case AST_FLOAT_LITERAL: {
             printf("float literal: %f\n", expr.asFloat.value);
             break;
@@ -120,11 +169,45 @@ static void printExpr(AstExpr expr, int indent) {
             break;
         }
         case AST_IDENTIFIER: {
-            printf("identifier: %s\n", expr.asIdentifer.name);
+            printf("identifier: %s\n", expr.asIdentifier.name);
             break;
         }
         case AST_ERR_EXPR: {
             printf("error expression\n");
+            break;
+        }
+        case AST_NEXT: {
+            printf("next statement\n");
+            break;
+        }
+        case AST_STOP: {
+            printf("stop statement\n");
+            break;
+        }
+        case AST_UNARY: {
+            printf("unary expression\n");
+
+            printIndent(indent + 2);
+            printf("operator: %s\n", mapOperatorType(expr.asUnary.operator));
+
+            printIndent(indent + 2);
+            printf("right: \n");
+            printExpr(*expr.asUnary.right, indent + 4);
+            break;
+        }
+        case AST_BINARY: {
+            printf("binary expression\n");
+
+            printIndent(indent + 2);
+            printf("left: \n");
+            printExpr(*expr.asBinary.left, indent + 4);
+
+            printIndent(indent + 2);
+            printf("operator: %s\n", mapOperatorType(expr.asBinary.operator));
+
+            printIndent(indent + 2);
+            printf("right: \n");
+            printExpr(*expr.asBinary.right, indent + 4);
             break;
         }
         case AST_LET: {
@@ -187,13 +270,26 @@ static void printExpr(AstExpr expr, int indent) {
 
             break;
         }
+        case AST_WHILE: {
+            printf("while statement:\n");
+
+            printIndent(indent + 2);
+            printf("value:\n");
+            printExpr(*expr.asWhile.condition, indent + 2);
+
+            printIndent(indent + 2);
+            printf("body (%d):\n", expr.asWhile.block.count);
+            for (int i = 0; i < expr.asWhile.block.count; i++) {
+                printExpr(*expr.asWhile.block.body[i], indent + 2);
+            }
+            break;
+        }
         case AST_RETURN: {
             printf("return statement:\n");
 
             printIndent(indent + 2);
             printf("value:\n");
-            printIndent(indent + 2);
-            printExpr(*expr.asReturn.value, indent);
+            printExpr(*expr.asReturn.value, indent + 2);
             break;
         }
         case AST_STRUCT_DECLARATION: {
@@ -287,6 +383,12 @@ static AstExpr *parsePrimary(Parser *p) {
         case TOKEN_STRING: {
             return newStringExpr(token.lexeme);
         }
+        case TOKEN_TRUE: {
+            return newBoolExpr(token.lexeme[0] == 't');
+        }
+        case TOKEN_FALSE: {
+            return newBoolExpr(token.lexeme[0] == 'f');
+        }
         default: {
             compileErrFromParse(p, "expected expression");
             return newErrExpr();
@@ -294,8 +396,54 @@ static AstExpr *parsePrimary(Parser *p) {
     }
 }
 
-static AstExpr *parseExpr(Parser *p) {
+static AstExpr *parsePointerOp(Parser *p) {
+    while (match(p, TOKEN_STAR) || match(p, TOKEN_AMPERSAND)) {
+        TokenType operator = currentToken(p).type;
+        advance(p);
+
+        AstExpr *right = parseExpr(p);
+        if (isErr(right)) return right;
+
+        return newUnaryExpr(right, mapToOperatorType(operator));
+    }
+
     return parsePrimary(p);
+}
+
+static AstExpr *parseFactor(Parser *p) {
+    AstExpr *left = parsePointerOp(p);
+
+    while (match(p, TOKEN_STAR) || match(p, TOKEN_SLASH) || match(p, TOKEN_MODULO)) {
+        TokenType operator = currentToken(p).type;
+        advance(p);
+
+        AstExpr* right = parsePointerOp(p);
+        if (isErr(right)) return right;
+
+        left = newBinaryExpr(right, mapToOperatorType(operator), left);
+    }
+
+    return left;
+}
+
+static AstExpr *parseTerm(Parser *p) {
+    AstExpr *left = parseFactor(p);
+
+    while (match(p, TOKEN_PLUS) || match(p, TOKEN_MINUS)) {
+        TokenType operator = currentToken(p).type;
+        advance(p);
+
+        AstExpr* right = parseFactor(p);
+        if (isErr(right)) return right;
+
+        left = newBinaryExpr(right, mapToOperatorType(operator), left);
+    }
+
+    return left;
+}
+
+static AstExpr *parseExpr(Parser *p) {
+    return parseTerm(p);
 }
 
 
@@ -331,17 +479,13 @@ static AstExpr *parseLet(Parser *p) {
         return error(p, "expected identifier after 'let'");
     }
 
-    AstExpr *type = newTypeExpr("", 0);
-    if (match(p, TOKEN_COLON)) {
-        advance(p);
+    if (!expect(p, TOKEN_COLON)) {
+        return error(p, "expected ':' and then a type specifier");
+    }
 
-        AstExpr *typeExpr = parseType(p);
-        if (typeExpr->type != AST_TYPE_EXPR) {
-            return error(p, "expected type after ':'");
-        }
-        
-        free(type);
-        type = typeExpr;
+    AstExpr *typeExpr = parseType(p);
+    if (typeExpr->type != AST_TYPE_EXPR) {
+        return error(p, "expected type after ':'");
     }
 
     if (!expect(p, TOKEN_SINGLE_EQUALS)) {
@@ -353,10 +497,16 @@ static AstExpr *parseLet(Parser *p) {
         return error(p, "expected expression");
     }
 
-    return newLetDeclaration(name.lexeme, type, value);
+    return newLetDeclaration(name.lexeme, typeExpr, value);
 }
 
 static AstExpr *parseAssignment(Parser *p) {
+    int ptrDepth = 0;
+    while (match(p, TOKEN_STAR)) {
+        ptrDepth++;
+        advance(p);
+    }
+
     Token name = currentToken(p);
     advance(p);
 
@@ -365,9 +515,9 @@ static AstExpr *parseAssignment(Parser *p) {
     }
 
     AstExpr *value = parseExpr(p);
-    if (isErr(value)) return error(p, "expected expression");
+    if (isErr(value)) return value;
 
-    return newAssignExpr(name.lexeme, value);
+    return newAssignExpr(name.lexeme, value, ptrDepth);
 }
 
 static AstExpr *parseBlock(Parser *p) {
@@ -549,6 +699,91 @@ static AstExpr *parseInterface(Parser *p) {
     return error(p, "expected 'struct' declaration after 'interface'");
 }
 
+static AstExpr *parseNext(Parser *p) {
+    advance(p);
+
+    return newNextStatement();
+}
+
+
+static AstExpr *parseStop(Parser *p) {
+    advance(p);
+
+    return newStopStatement();
+}
+
+static AstExpr *parseWhile(Parser *p) {
+    advance(p);
+
+    AstExpr *condition = parseExpr(p);
+    if (isErr(condition)) return condition;
+
+    if (!expect(p, TOKEN_LEFT_BRACE)) {
+        return error(p, "expected '{'");
+    }
+
+    AstExpr *block = parseBlock(p);
+    if (isErr(block)) return block;
+
+    if (!expect(p, TOKEN_RIGHT_BRACE)) {
+        return error(p, "expected '}'");
+    }
+
+    return newWhileStatement(condition, block);
+}
+
+static AstExpr *parseCallExpression(Parser *p) {
+    Token name = currentToken(p);
+    advance(p);
+
+    if (!expect(p, TOKEN_LEFT_PAREN)) {
+        return error(p, "expected '(' in call expression");
+    }
+
+    AstExpr **arguments = malloc(sizeof(AstExpr *));
+    int count = 0;
+    int capacity = 1;
+
+    if (!match(p, TOKEN_RIGHT_PAREN)) {
+        recede(p);
+
+        do {
+            advance(p);
+
+            AstExpr *val = parseExpr(p);
+            if (isErr(val)) return val;
+
+            if (count >= capacity) {
+                capacity *= 2;
+                arguments = realloc(arguments, sizeof(AstExpr *) * capacity);
+            }
+            arguments[count++] = val;
+
+        } while (match(p, TOKEN_COMMA));
+    }
+    
+    if (!expect(p, TOKEN_RIGHT_PAREN)) {
+        return error(p, "expected '(' in call expression");
+    }
+
+    return newCallExpr(name.lexeme, count, capacity, arguments);
+}
+
+static AstExpr *parseIdentifier(Parser *p) {
+    advance(p);
+
+    if (match(p, TOKEN_SINGLE_EQUALS)) {
+        recede(p);
+
+        return parseAssignment(p);
+    } else if (match(p, TOKEN_LEFT_PAREN)) {
+        recede(p);
+
+        return parseCallExpression(p);
+    }
+    
+    return parseExpr(p);
+}
 
 static AstExpr *parseStatement(Parser *p) {
     Token token = currentToken(p);
@@ -557,8 +792,11 @@ static AstExpr *parseStatement(Parser *p) {
         case TOKEN_LET: {
             return parseLet(p);
         }
-        case TOKEN_IDENTIFIER: {
+        case TOKEN_STAR: {
             return parseAssignment(p);
+        }
+        case TOKEN_IDENTIFIER: {
+            return parseIdentifier(p);
         }
         case TOKEN_FN: {
             return parseFunction(p);
@@ -571,6 +809,15 @@ static AstExpr *parseStatement(Parser *p) {
         }
         case TOKEN_INTERFACE: {
             return parseInterface(p);
+        }
+        case TOKEN_WHILE: {
+            return parseWhile(p);
+        }
+        case TOKEN_STOP: {
+            return parseStop(p);
+        }
+        case TOKEN_NEXT: {
+            return parseNext(p);
         }
         default: {
             return parseExpr(p);

@@ -5,39 +5,215 @@
 #include "analyze.h"
 #include "err.h"
 
+static void analyzeExpr(Analyzer *analyzer, AstExpr *expr);
+
+void initScope(Scope *scope) {
+    scope->symbols = malloc(sizeof(Symbol) * 1);
+    scope->count = 0;
+    scope->capacity = 1;
+}
+
+void pushScope(SymbolTable *table) {
+    if (table->depth >= table->capacity) {
+        table->capacity *= 2;
+        table->scopes = realloc(table->scopes, sizeof(Scope) * table->capacity);
+    }
+
+    initScope(&table->scopes[table->depth++]);
+}
+
+void popScope(SymbolTable *table) {
+    if (table->depth == 0) return;
+
+    Scope *top = &table->scopes[--table->depth];
+    free(top->symbols);
+}
+
 Analyzer newAnalyzer(Parser *parser) {
     Analyzer analyzer;
 
     analyzer.parser = parser;
     analyzer.hadErr = false;
 
+    analyzer.table.scopes = malloc(sizeof(Scope));
+    analyzer.table.depth = 0;
+    analyzer.table.capacity = 1;
+
+    analyzer.insideLoop = false;
+
+    pushScope(&analyzer.table);
+
     return analyzer;
 }
 
-void analyzeFunctionDeclaration(FunctionDeclaration function) {
-    if (function.name) return;
+static void raiseNoEntryPointErr(Analyzer *analyzer) {
+    compileErrFromAnalyzer(analyzer, "program requires an entry point 'main' defined\n");
 }
 
-void analyzeAssignExpr(AssignmentExpr assign) {
-    if (assign.value) return;
+static void raiseDuplicateSymbol(Analyzer *analyzer, char *name) {
+    compileErrFromAnalyzer(analyzer, "symbol '%s' already defined in this scope\n", name);
 }
 
-void analyzeLet(LetDeclaration let) {
-    if (let.value) return;
+static void raiseUndefinedSymbol(Analyzer *analyzer, char *name) {
+    compileErrFromAnalyzer(analyzer, "symbol '%s' does not exist in this scope\n", name);
 }
 
-void analyzeExpr(AstExpr *expr) {
+static void raiseInvalidLoopContextualKeyword(Analyzer *analyzer, char *keyword) {
+    compileErrFromAnalyzer(analyzer, "keyword '%s' can only be used inside a loop body\n", keyword);
+}
+
+static bool declareSymbol(SymbolTable *table, char *name) {
+    if (table->depth == 0) return true;
+    
+    Scope *current = &table->scopes[table->depth - 1];
+
+    for (int i = 0; i < current->count; i++) {
+        if (strcmp(name, current->symbols[i].name) == 0) {
+            return false;
+        }
+    }
+
+    if (current->count >= current->capacity) {
+        current->capacity *= 2;
+        current->symbols = realloc(current->symbols, sizeof(Symbol) * current->capacity);
+    }
+
+    current->symbols[current->count++] = (Symbol){ .name = name };
+
+    return true;
+}
+
+static void analyzeFunctionDeclaration(Analyzer *analyzer, FunctionDeclaration function) {
+    if (!declareSymbol(&analyzer->table, function.name)) {
+        raiseDuplicateSymbol(analyzer, function.name);
+    }
+
+    pushScope(&analyzer->table);
+
+    for (int i = 0; i < function.paramCount; i++) {
+        if (!declareSymbol(&analyzer->table, function.parameters[i].name)) {
+            raiseDuplicateSymbol(analyzer, function.parameters[i].name);
+        }
+    }
+
+    for (int i = 0; i < function.block.count; i++) {
+        if (function.block.body[i]->type == AST_RETURN) {
+            // resolve return type
+        }
+
+        analyzeExpr(analyzer, function.block.body[i]);
+    }
+
+    popScope(&analyzer->table);
+}
+
+static bool symbolExists(SymbolTable *table, char *name) {
+    if (table->depth == 0) return false;
+
+    Scope *current = &table->scopes[table->depth - 1];
+    for (int i = 0; i < current->count; i++) {
+        if (strcmp(current->symbols[i].name, name) == 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static void analyzeAssignExpr(Analyzer *analyzer, AssignmentExpr assign) {
+    if (!symbolExists(&analyzer->table, assign.name)) {
+        raiseUndefinedSymbol(analyzer, assign.name);
+        return;
+    }
+
+
+}
+
+static void analyzeLet(Analyzer *analyzer, LetDeclaration let) {
+    if (!declareSymbol(&analyzer->table, let.name)) {
+        raiseDuplicateSymbol(analyzer, let.name);
+    }
+
+    analyzeExpr(analyzer, let.value);
+}
+
+static void analyzeReturnStatement(Analyzer *analyzer, ReturnStatement returnStatement) {
+    if (!analyzer) return;
+    if (!returnStatement.value) return;
+}
+
+static void analyzeStop(Analyzer *analyzer, StopStatement stop) {
+    if (!analyzer->insideLoop) {
+        raiseInvalidLoopContextualKeyword(analyzer, "stop");
+    }
+
+    // prevent compiler warning
+    if (stop.dummy == ' ') return;
+}
+
+static void analyzeNext(Analyzer *analyzer, NextStatement next) {
+    if (!analyzer->insideLoop) {
+        raiseInvalidLoopContextualKeyword(analyzer, "next");
+    }
+
+    // prevent compiler warning
+    if (next.dummy == ' ') return;
+}
+
+static void analyzeWhile(Analyzer *analyzer, WhileStatement whileStatement) {
+    analyzer->insideLoop = true;
+
+    analyzeExpr(analyzer, whileStatement.condition);
+
+    for (int i = 0; i < whileStatement.block.count; i++) {
+        analyzeExpr(analyzer, whileStatement.block.body[i]);
+    }
+
+    analyzer->insideLoop = false;
+}
+
+static void analyzeCallExpr(Analyzer *analyzer, CallExpr call) {
+    if (!symbolExists(&analyzer->table, call.name)) {
+        // fix to search outer scopes not just current
+        // raiseUndefinedSymbol(analyzer, call.name);
+    }
+}
+
+static void analyzeExpr(Analyzer *analyzer, AstExpr *expr) {
     switch (expr->type) {
         case AST_LET: {
-            analyzeLet(expr->asLet);
+            analyzeLet(analyzer, expr->asLet);
             break;
         }
         case AST_ASSIGN_EXPR: {
-            analyzeAssignExpr(expr->asAssign);
+            analyzeAssignExpr(analyzer, expr->asAssign);
             break;
         }
         case AST_FUNCTION_DECLARATION: {
-            analyzeFunctionDeclaration(expr->asFunction);
+            analyzeFunctionDeclaration(analyzer, expr->asFunction);
+            break;
+        }
+        case AST_RETURN: {
+            analyzeReturnStatement(analyzer, expr->asReturn);
+            break;
+        }
+        case AST_WHILE: {
+            analyzeWhile(analyzer, expr->asWhile);
+            break;
+        }
+        case AST_NEXT: {
+            analyzeNext(analyzer, expr->asNext);
+            break;
+        }
+        case AST_STOP: {
+            analyzeStop(analyzer, expr->asStop);
+            break;
+        }
+        case AST_UNARY: {
+            break;
+        }
+        case AST_CALL_EXPR: {
+            analyzeCallExpr(analyzer, expr->asCallExpr);
             break;
         }
         case AST_STRUCT_DECLARATION: {
@@ -50,6 +226,9 @@ void analyzeExpr(AstExpr *expr) {
             break;
         }
         case AST_INTEGER_LITERAL: {
+            break;
+        }
+        case AST_BOOL_LITERAL: {
             break;
         }
         case AST_STRING_LITERAL: {
@@ -68,10 +247,6 @@ void analyzeExpr(AstExpr *expr) {
     }
 }
 
-void raiseNoEntryPointErr(Analyzer *analyzer) {
-    compileErrFromAnalyzer(analyzer, "program requires an entry point 'main' defined\n");
-}
-
 void analyze(Analyzer *analyzer) {
     if (analyzer->parser->ast.exprCount == 0) {
         raiseNoEntryPointErr(analyzer);
@@ -88,7 +263,7 @@ void analyze(Analyzer *analyzer) {
             }
         }
 
-        analyzeExpr(expr);
+        analyzeExpr(analyzer, expr);
     }
 
     if (!hasEntryPoint) {

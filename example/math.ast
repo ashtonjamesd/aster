@@ -1,0 +1,5 @@
+module math
+
+fn square(a: u8, b: u8) {
+    return a * b
+}

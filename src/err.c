@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdarg.h>
 
 #include "err.h"
 #include "parse.h"
@@ -66,12 +67,18 @@ void compileErrFromTokenize(Lexer *lexer, char *message) {
     printf("\n\n");
 }
 
-void compileErrFromAnalyzer(Analyzer *analyzer, char *message) {
+
+void compileErrFromAnalyzer(Analyzer *analyzer, const char *format, ...) {
     analyzer->hadErr = true;
 
     printf("\n");
     printf("in %s\n", analyzer->parser->filePath);
-    printf("%s", message);
+
+    va_list args;
+    va_start(args, format);
+    vprintf(format, args);
+    va_end(args);
+
     printf("\n");
 }
 

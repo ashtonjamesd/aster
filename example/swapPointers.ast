@@ -1,0 +1,14 @@
+fn swap(a: *u8, b: *u8): u0 {
+    let temp: u8 = 0
+
+    temp = *a
+    *a = *b
+    *b = temp
+}
+
+fn main(argc: u32, argv: **i8): i8 {
+    let a: u8 = 5
+    let b: u8 = 7
+
+    swap(&a, &b)
+}

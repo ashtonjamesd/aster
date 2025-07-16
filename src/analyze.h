@@ -5,9 +5,29 @@
 #include "parse.h"
 
 typedef struct {
-    bool hadErr;
+    char    *name;
+    AstExpr *declaration;
+} Symbol;
 
-    Parser *parser;
+typedef struct {
+    Symbol *symbols;
+    int     count;
+    int     capacity;
+} Scope;
+
+typedef struct {
+    Scope *scopes;
+    int    depth;
+    int    capacity;
+} SymbolTable;
+
+typedef struct {
+    bool        hadErr;
+
+    bool        insideLoop;
+
+    Parser     *parser;
+    SymbolTable table;
 } Analyzer;
 
 

@@ -33,3 +33,49 @@ char *mapPrimitiveTypeToC(char *type) {
     // prevents compiler warning (-Wreturn-type)
     exit(1);
 }
+
+OperatorType mapToOperatorType(TokenType type) {
+    switch (type) {
+        case TOKEN_AMPERSAND: {
+            return OP_ADDRESS_OF;
+        }
+        case TOKEN_STAR: {
+            return OP_DEREF;
+        }
+        case TOKEN_PLUS: {
+            return OP_PLUS;
+        }
+        case TOKEN_MINUS: {
+            return OP_MINUS;
+        }
+        default: {
+            exitWithInternalCompilerError("unable to map to operator type");
+
+            // prevent compiler warning
+            exit(1);
+        }
+    }
+}
+
+char *mapOperatorType(OperatorType type) {
+    switch (type) {
+        case OP_ADDRESS_OF: {
+            return "&";
+        }
+        case OP_DEREF: {
+            return "*";
+        }
+        case OP_PLUS: {
+            return "+";
+        }
+        case OP_MINUS: {
+            return "-";
+        }
+        default: {
+            exitWithInternalCompilerError("unable to map to operator type");
+
+            // prevent compiler warning
+            exit(1);
+        }
+    }
+}

@@ -43,6 +43,13 @@ ExecResult compileToC(AsterCompiler *compiler) {
     Analyzer analyzer = newAnalyzer(&parser);
     analyze(&analyzer);
 
+    if (analyzer.hadErr) {
+        freeParser(&parser);
+        freeLexer(&lexer);
+
+        return EXEC_COMPILE_ERR;
+    }
+
     FILE *fptr = fopen("out.c", "w");
     if (!fptr) {
         fprintf(stderr, "unable to open c source output\n");

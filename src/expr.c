@@ -32,7 +32,7 @@ AstExpr *newFloatExpr(float value) {
 AstExpr *newIdentifierExpr(char *name) {
     AstExpr *expr = newExpr(AST_IDENTIFIER);
 
-    expr->asIdentifer.name = strdup(name);
+    expr->asIdentifier.name = strdup(name);
 
     return expr;
 }
@@ -41,6 +41,14 @@ AstExpr *newStringExpr(char *str) {
     AstExpr *expr = newExpr(AST_STRING_LITERAL);
 
     expr->asString.value = strdup(str);
+
+    return expr;
+}
+
+AstExpr *newBoolExpr(bool value) {
+    AstExpr *expr = newExpr(AST_BOOL_LITERAL);
+
+    expr->asBool.value = value;
 
     return expr;
 }
@@ -72,11 +80,12 @@ AstExpr *newTypeExpr(char *name, uint8_t ptrDepth) {
     return expr;
 }
 
-AstExpr *newAssignExpr(char *name, AstExpr *value) {
+AstExpr *newAssignExpr(char *name, AstExpr *value, uint8_t ptrDepth) {
     AstExpr *expr = newExpr(AST_ASSIGN_EXPR);
 
     expr->asAssign.name = strdup(name);
     expr->asAssign.value = value;
+    expr->asAssign.ptrDepth = ptrDepth;
 
     return expr;
 }
@@ -138,6 +147,57 @@ AstExpr *newStructField(char *name, AstExpr *type) {
 
     expr->asStructField.name = strdup(name);
     expr->asStructField.type = type->asType;
+
+    return expr;
+}
+
+AstExpr *newWhileStatement(AstExpr *condition, AstExpr *block) {
+    AstExpr *expr = newExpr(AST_WHILE);
+    
+    expr->asWhile.block = block->asBlock;
+    expr->asWhile.condition = condition;
+
+    return expr;
+}
+
+AstExpr *newNextStatement() {
+    AstExpr *expr = newExpr(AST_NEXT);
+
+    return expr;
+}
+
+AstExpr *newStopStatement() {
+    AstExpr *expr = newExpr(AST_STOP);
+
+    return expr;
+}
+
+AstExpr *newUnaryExpr(AstExpr *right, OperatorType operator) {
+    AstExpr *expr = newExpr(AST_UNARY);
+
+    expr->asUnary.right = right;
+    expr->asUnary.operator = operator;
+
+    return expr;
+}
+
+AstExpr *newCallExpr(char *name, int argCount, int argCapacity, AstExpr **arguments) {
+    AstExpr *expr = newExpr(AST_CALL_EXPR);
+
+    expr->asCallExpr.name = strdup(name);
+    expr->asCallExpr.argCount = argCount;
+    expr->asCallExpr.argCapacity = argCapacity;
+    expr->asCallExpr.arguments = arguments;
+
+    return expr;
+}
+
+AstExpr *newBinaryExpr(AstExpr *right, OperatorType operator, AstExpr *left) {
+    AstExpr *expr = newExpr(AST_BINARY);
+
+    expr->asBinary.right = right;
+    expr->asBinary.operator = operator;
+    expr->asBinary.left = left;
 
     return expr;
 }

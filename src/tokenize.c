@@ -42,6 +42,11 @@ static void initKeywords(Lexer *l) {
     newKeyword(l, "return", TOKEN_RETURN);
     newKeyword(l, "struct", TOKEN_STRUCT);
     newKeyword(l, "interface", TOKEN_INTERFACE);
+    newKeyword(l, "true", TOKEN_TRUE);
+    newKeyword(l, "false", TOKEN_FALSE);
+    newKeyword(l, "while", TOKEN_WHILE);
+    newKeyword(l, "next", TOKEN_NEXT);
+    newKeyword(l, "stop", TOKEN_STOP);
 }
 
 Lexer newLexer(char *filePath, char *source, bool debug) {
@@ -187,6 +192,11 @@ static Token tokenizeSymbol(Lexer *l) {
         case '{': return newToken("{", TOKEN_LEFT_BRACE, l);
         case '}': return newToken("}", TOKEN_RIGHT_BRACE, l);
         case ',': return newToken(",", TOKEN_COMMA, l);
+        case '&': return newToken("&", TOKEN_AMPERSAND, l);
+        case '+': return newToken("+", TOKEN_PLUS, l);
+        case '-': return newToken("-", TOKEN_MINUS, l);
+        case '/': return newToken("/", TOKEN_SLASH, l);
+        case '%': return newToken("%", TOKEN_MODULO, l);
         default:  return badToken(l);
     }
 }
