@@ -54,6 +54,60 @@ OperatorType mapToOperatorType(TokenType type) {
         case TOKEN_GREATER_THAN: {
             return OP_GREATER_THAN;
         }
+        case TOKEN_GREATER_THAN_EQUALS: {
+            return OP_GREATER_THAN_EQUALS;
+        }
+        case TOKEN_LESS_THAN_EQUALS: {
+            return OP_LESS_THAN_EQUALS;
+        }
+        case TOKEN_NOT_EQUALS: {
+            return OP_NOT_EQUALS;
+        }
+        case TOKEN_DOUBLE_EQUALS: {
+            return OP_EQUALS;
+        }
+        case TOKEN_AND: {
+            return OP_AND;
+        }
+        case TOKEN_OR: {
+            return OP_OR;
+        }
+        case TOKEN_NOT: {
+            return OP_NOT;
+        }
+        case TOKEN_SLASH: {
+            return OP_DIVIDE;
+        }
+        case TOKEN_MOD: {
+            return OP_MOD;
+        }
+        case TOKEN_MODULO: {
+            return OP_MOD;
+        }
+        case TOKEN_SIZEOF: {
+            return OP_SIZEOF;
+        }
+        case TOKEN_PIPE: {
+            return OP_BITWISE_OR;
+        }
+        case TOKEN_TILDE: {
+            return OP_BITWISE_NOT;
+        }
+        case TOKEN_SHIFT_LEFT: {
+            return OP_BITWISE_SHIFT_LEFT;
+        }
+        case TOKEN_SHIFT_RIGHT: {
+            return OP_BITWISE_SHIFT_RIGHT;
+        }
+        case TOKEN_CARET: {
+            return OP_BITWISE_XOR;
+        }
+        case TOKEN_XOR: {
+            return OP_BITWISE_XOR;
+        }
+        case TOKEN_AS: {
+            return OP_AS_CAST;
+        }
         default: {
             exitWithInternalCompilerError("unable to map to operator type");
 
@@ -82,6 +136,56 @@ char *mapOperatorType(OperatorType type) {
         }
         case OP_GREATER_THAN: {
             return ">";
+        }
+        case OP_GREATER_THAN_EQUALS: {
+            return ">=";
+        }
+        case OP_LESS_THAN_EQUALS: {
+            return "<=";
+        }
+        case OP_EQUALS: {
+            return "==";
+        }
+        case OP_NOT_EQUALS: {
+            return "!=";
+        }
+        case OP_NOT: {
+            return "!";
+        }
+        case OP_AND: {
+            return "&&";
+        }
+        case OP_OR: {
+            return "||";
+        }
+        case OP_SIZEOF: {
+            return "sizeof";
+        }
+        case OP_BITWISE_AND: {
+            return "&";
+        }
+        case OP_BITWISE_OR: {
+            return "|";
+        }
+        case OP_BITWISE_NOT: {
+            return "~";
+        }
+        case OP_BITWISE_SHIFT_RIGHT: {
+            return ">>";
+        }
+        case OP_BITWISE_SHIFT_LEFT: {
+            return "<<";
+        }
+        case OP_MOD: {
+            return "%";
+        }
+        case OP_BITWISE_XOR: {
+            return "^";
+        }
+        // this operator doesn't have a reasonable symbol to return
+        // it is handled specially in the transpiler
+        case OP_AS_CAST: {
+            return "";
         }
         default: {
             exitWithInternalCompilerError("unable to map to operator type");

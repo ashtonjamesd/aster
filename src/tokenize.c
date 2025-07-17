@@ -50,6 +50,16 @@ static void initKeywords(Lexer *l) {
     newKeyword(l, "if", TOKEN_IF);
     newKeyword(l, "then", TOKEN_THEN);
     newKeyword(l, "else", TOKEN_ELSE);
+    newKeyword(l, "pub", TOKEN_PUB);
+    newKeyword(l, "for", TOKEN_FOR);
+    newKeyword(l, "in", TOKEN_IN);
+    newKeyword(l, "not", TOKEN_NOT);
+    newKeyword(l, "and", TOKEN_AND);
+    newKeyword(l, "or", TOKEN_OR);
+    newKeyword(l, "xor", TOKEN_XOR);
+    newKeyword(l, "mod", TOKEN_MOD);
+    newKeyword(l, "sizeof", TOKEN_SIZEOF);
+    newKeyword(l, "as", TOKEN_AS);
 }
 
 Lexer newLexer(char *filePath, char *source, bool debug) {
@@ -191,9 +201,20 @@ static Token tokenizeSymbol(Lexer *l) {
             if (currentChar(l) == '>') {
                 advance(l);
                 return newToken("=>", TOKEN_LAMBDA, l);
+            } else if (currentChar(l) == '=') {
+                advance(l);
+                return newToken("==", TOKEN_DOUBLE_EQUALS, l);
             }
 
             return newToken("=", TOKEN_SINGLE_EQUALS, l);
+        }
+        case '!': {
+            if (currentChar(l) == '=') {
+                advance(l);
+                return newToken("!=", TOKEN_NOT_EQUALS, l);
+            }
+
+            return newToken("!", TOKEN_NOT, l);
         }
         case ':': return newToken(":", TOKEN_COLON, l);
         case '*': return newToken("*", TOKEN_STAR, l);
@@ -202,13 +223,50 @@ static Token tokenizeSymbol(Lexer *l) {
         case '{': return newToken("{", TOKEN_LEFT_BRACE, l);
         case '}': return newToken("}", TOKEN_RIGHT_BRACE, l);
         case ',': return newToken(",", TOKEN_COMMA, l);
-        case '&': return newToken("&", TOKEN_AMPERSAND, l);
+        case '|': {
+            if (currentChar(l) == '|') {
+                advance(l);
+                return newToken("||", TOKEN_OR, l);
+            }
+
+            return newToken("|", TOKEN_PIPE, l);
+        }
+        case '&': {
+            if (currentChar(l) == '&') {
+                advance(l);
+                return newToken("!=", TOKEN_AND, l);
+            }
+
+            return newToken("&", TOKEN_AMPERSAND, l);
+        }
+        case '^': return newToken("^", TOKEN_CARET, l);
+        case '~': return newToken("~", TOKEN_TILDE, l);
         case '+': return newToken("+", TOKEN_PLUS, l);
         case '-': return newToken("-", TOKEN_MINUS, l);
         case '/': return newToken("/", TOKEN_SLASH, l);
         case '%': return newToken("%", TOKEN_MODULO, l);
-        case '>': return newToken(">", TOKEN_GREATER_THAN, l);
-        case '<': return newToken("<", TOKEN_LESS_THAN, l);
+        case '>': {
+            if (currentChar(l) == '=') {
+                advance(l);
+                return newToken(">=", TOKEN_GREATER_THAN_EQUALS, l);
+            } else if (currentChar(l) == '>') {
+                advance(l);
+                return newToken(">>", TOKEN_SHIFT_RIGHT, l);
+            }
+
+            return newToken(">", TOKEN_GREATER_THAN, l);
+        }
+        case '<': {
+            if (currentChar(l) == '=') {
+                advance(l);
+                return newToken("<=", TOKEN_LESS_THAN_EQUALS, l);
+            } else if (currentChar(l) == '<') {
+                advance(l);
+                return newToken("<<", TOKEN_SHIFT_LEFT, l);
+            }
+
+            return newToken("<", TOKEN_LESS_THAN, l);
+        }
         default:  return badToken(l);
     }
 }

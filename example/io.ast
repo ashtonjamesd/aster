@@ -1,0 +1,5 @@
+pub struct io {
+    pub fn print(str: *u8): u0 {
+        
+    }
+}

@@ -134,6 +134,11 @@ static void emitWhileStatement(Transpiler *t, WhileStatement whileStatement) {
     emitNewline(t);
 }
 
+static void emitForStatement(Transpiler *t, ForStatement forStatement) {
+    if (!t) return;
+    if (!forStatement.iterator) return;
+}
+
 
 static void emitLetDeclaration(Transpiler *t, LetDeclaration let) {
     emitTypeExpression(t, let.type);
@@ -200,6 +205,25 @@ static void emitStructDeclaration(Transpiler *t, StructDeclaration structDeclara
     emitNewline(t);
 }
 
+static void emitIfStatement(Transpiler *t, IfStatement ifStatement) {
+    emit(t, "if");
+    emitSpace(t);
+    emitLeftParen(t);
+    emitExpr(t, ifStatement.condition);
+    emitRightParen(t);
+    emitSpace(t);
+
+    emitLeftBrace(t);
+        emitNewline(t);
+
+    for (int i = 0; i < ifStatement.block.count; i++) {
+        emitExpr(t, ifStatement.block.body[i]);
+    }
+
+    emitRightBrace(t);
+    emitNewline(t);
+}
+
 static void emitAssignExpression(Transpiler *t, AssignmentExpr assign) {
     for (int i = 0; i < assign.ptrDepth; i++) emitStar(t);
     emit(t, assign.name);
@@ -262,14 +286,28 @@ static void emitStop(Transpiler *t, StopStatement stop) {
 }
 
 static void emitUnary(Transpiler *t, UnaryExpr unary) {
-    emit(t, mapOperatorType(unary.operator));
-    emitExpr(t, unary.right);
+    if (unary.operator == OP_SIZEOF) {
+        emit(t, mapOperatorType(unary.operator));
+        emitLeftParen(t);
+        emitExpr(t, unary.right);
+        emitRightParen(t);
+    } else {
+        emit(t, mapOperatorType(unary.operator));
+        emitExpr(t, unary.right);
+    }
 }
 
 static void emitBinary(Transpiler *t, BinaryExpr binary) {
-    emitExpr(t, binary.left);
-    emit(t, mapOperatorType(binary.operator));
-    emitExpr(t, binary.right);
+    if (binary.operator == OP_AS_CAST) {
+        emitLeftParen(t);
+        emit(t, mapPrimitiveTypeToC(binary.right->asIdentifier.name));
+        emitRightParen(t);
+        emitExpr(t, binary.left);
+    } else {
+        emitExpr(t, binary.left);
+        emit(t, mapOperatorType(binary.operator));
+        emitExpr(t, binary.right);
+    }
 }
 
 static void emitCallExpr(Transpiler *t, CallExpr call) {
@@ -309,8 +347,16 @@ static void emitExpr(Transpiler *t, AstExpr *expr) {
             emitWhileStatement(t, expr->asWhile);
             break;
         }
+        case AST_FOR: {
+            emitForStatement(t, expr->asFor);
+            break;
+        }
         case AST_ASSIGN_EXPR: {
             emitAssignExpression(t, expr->asAssign);
+            break;
+        }
+        case AST_IF: {
+            emitIfStatement(t, expr->asIf);
             break;
         }
         case AST_NEXT: {

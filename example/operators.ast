@@ -1,0 +1,33 @@
+pub fn main(): u0 {
+    let a: i8 = 'a'
+    let b: bool = true
+    let c: *u8 = "Hello, World!"
+    let d: f32 = 2.5
+
+    let e: i8 = if true then 1 else 0
+    
+    let f: bool = true && false || false
+    let f_: bool = true and false or false
+
+    let g: bool = true || false && true && !false
+    let g_: bool = true or false and true and not false
+
+    let h: i8 = 35 | 23
+    let i: i8 = 88 | 13 & 32
+    let z: i8 = 3 ^ 1
+    let z_: i8 = 3 xor 1
+    let j: i8 = ~7 & 1
+    let k: i8 = 1 > 2
+    let l: i8 = 1 > 2 && 8 < 2
+    let m: i8 = 32 >= 54
+    let n: i8 = 13 <= 99
+    let o: i8 = 5 >> 2
+    let p: i8 = 53 << 2
+
+    let q: i8 = 2 + 2
+    let r: i8 = 2 * 2 - 1
+    let s: i8 = 2 mod 5
+    let s_: i8 = 2 % 5
+
+    let t: i8 = s as u8
+}

@@ -90,7 +90,7 @@ AstExpr *newAssignExpr(char *name, AstExpr *value, uint8_t ptrDepth) {
     return expr;
 }
 
-AstExpr *newFunctionDeclaration(char *name, TypeExpr returnType, BlockExpr body, int paramCount, int paramCapacity, FunctionParameter *parameters, bool isLambda, AstExpr *lambdaExpr) {
+AstExpr *newFunctionDeclaration(char *name, TypeExpr returnType, BlockExpr body, int paramCount, int paramCapacity, FunctionParameter *parameters, bool isLambda, AstExpr *lambdaExpr, bool isPublic) {
     AstExpr *expr = newExpr(AST_FUNCTION_DECLARATION);
 
     expr->asFunction.name = strdup(name);
@@ -101,6 +101,7 @@ AstExpr *newFunctionDeclaration(char *name, TypeExpr returnType, BlockExpr body,
     expr->asFunction.parameters = parameters;
     expr->asFunction.isLambda = isLambda;
     expr->asFunction.lambdaExpr = lambdaExpr;
+    expr->asFunction.isPublic = isPublic;
 
     return expr;
 }
@@ -132,7 +133,7 @@ AstExpr *newFunctionParameter(char *name, AstExpr *type) {
     return expr;
 }
 
-AstExpr *newStructDeclaration(char *name, AstExpr **members, int memberCount, int memberCapacity, bool isInterface) {
+AstExpr *newStructDeclaration(char *name, AstExpr **members, int memberCount, int memberCapacity, bool isInterface, bool isPublic) {
     AstExpr *expr = newExpr(AST_STRUCT_DECLARATION);
     expr->asStruct.name = strdup(name);
 
@@ -140,6 +141,7 @@ AstExpr *newStructDeclaration(char *name, AstExpr **members, int memberCount, in
     expr->asStruct.memberCapacity = memberCapacity;
     expr->asStruct.memberCount = memberCount;
     expr->asStruct.isInterface = isInterface;
+    expr->asStruct.isPublic = isPublic;
 
     return expr;
 }
@@ -210,6 +212,25 @@ AstExpr *newTernaryExpr(AstExpr *condition, AstExpr *falseExpr, AstExpr *trueExp
     expr->asTernary.condition = condition;
     expr->asTernary.trueExpr = trueExpr;
     expr->asTernary.falseExpr = falseExpr;
+
+    return expr;
+}
+
+AstExpr *newForStatement(char *variable, AstExpr *iterator, BlockExpr block) {
+    AstExpr *expr = newExpr(AST_FOR);
+    
+    expr->asFor.block = block;
+    expr->asFor.variable = strdup(variable);
+    expr->asFor.iterator = iterator;
+
+    return expr;
+}
+
+AstExpr *newIfStatement(AstExpr *condition, BlockExpr block) {
+    AstExpr *expr = newExpr(AST_IF);
+    
+    expr->asIf.block = block;
+    expr->asIf.condition = condition;
 
     return expr;
 }

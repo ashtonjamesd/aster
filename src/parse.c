@@ -146,6 +146,22 @@ static void freeExpr(AstExpr *expr) {
             }
             break;
         }
+        case AST_IF: {
+            freeExpr(expr->asIf.condition);
+            for (int i = 0; i < expr->asIf.block.count; i++) {
+                freeExpr(expr->asIf.block.body[i]);
+            }
+            break;
+        }
+        case AST_FOR: {
+            freeExpr(expr->asFor.iterator);
+            free(expr->asFor.variable);
+            
+            for (int i = 0; i < expr->asFor.block.count; i++) {
+                freeExpr(expr->asFor.block.body[i]);
+            }
+            break;
+        }
         default: {
             exitWithInternalCompilerError("unknown AST expression type in 'freeExpr'");
         }
@@ -260,11 +276,28 @@ static void printExpr(AstExpr expr, int indent) {
             printExpr(*expr.asAssign.value, indent + 4);
             break;
         }
+        case AST_IF: {
+            printf("if statement:\n");
+            
+            printIndent(indent + 2);
+            printf("condition:\n");
+            printExpr(*expr.asIf.condition, indent + 2);
+
+            printIndent(indent + 2);
+            printf("body (%d):\n", expr.asIf.block.count);
+            for (int i = 0; i < expr.asIf.block.count; i++) {
+                printExpr(*expr.asIf.block.body[i], indent + 2);
+            }
+            break;
+        }
         case AST_FUNCTION_DECLARATION: {
             printf("function declaration:\n");
 
             printIndent(indent + 2);
             printf("name: %s\n", expr.asFunction.name);
+            
+            printIndent(indent + 2);
+            printf("public: %s\n", expr.asFunction.isPublic ? "true" : "false");
 
             printIndent(indent + 2);
             printf("type: ");
@@ -312,6 +345,23 @@ static void printExpr(AstExpr expr, int indent) {
             }
             break;
         }
+        case AST_FOR: {
+            printf("for statement:\n");
+
+            printIndent(indent + 2);
+            printf("variable: %s\n", expr.asFor.variable);
+
+            printIndent(indent + 2);
+            printf("iterator:\n");
+            printExpr(*expr.asFor.iterator, indent + 4);
+
+            printIndent(indent + 2);
+            printf("body (%d):\n", expr.asFor.block.count);
+            for (int i = 0; i < expr.asFor.block.count; i++) {
+                printExpr(*expr.asFor.block.body[i], indent + 4);
+            }
+            break;
+        }
         case AST_RETURN: {
             printf("return statement:\n");
 
@@ -328,6 +378,9 @@ static void printExpr(AstExpr expr, int indent) {
 
             printIndent(indent + 2);
             printf("interface: %s\n", expr.asStruct.isInterface ? "true" : "false");
+
+            printIndent(indent + 2);
+            printf("public: %s\n", expr.asStruct.isPublic ? "true" : "false");
 
             printIndent(indent + 2);
             printf("members (%d):\n", expr.asStruct.memberCount);
@@ -454,7 +507,7 @@ static AstExpr *parsePrimary(Parser *p) {
 }
 
 static AstExpr *parsePointerOp(Parser *p) {
-    while (match(p, TOKEN_STAR) || match(p, TOKEN_AMPERSAND)) {
+    while (match(p, TOKEN_STAR) || match(p, TOKEN_AMPERSAND) || match(p, TOKEN_SIZEOF)) {
         TokenType operator = currentToken(p).type;
         advance(p);
 
@@ -468,7 +521,9 @@ static AstExpr *parsePointerOp(Parser *p) {
 }
 
 static AstExpr *parseUnary(Parser *p) {
-    while (match(p, TOKEN_MINUS) || match(p, TOKEN_PLUS)) {
+    while (match(p, TOKEN_MINUS) || match(p, TOKEN_PLUS) || 
+        match(p, TOKEN_NOT) || match(p, TOKEN_TILDE)
+    ) {
         TokenType operator = currentToken(p).type;
         advance(p);
 
@@ -481,14 +536,30 @@ static AstExpr *parseUnary(Parser *p) {
     return parsePointerOp(p);
 }
 
-static AstExpr *parseFactor(Parser *p) {
+static AstExpr *parseAs(Parser *p) {
     AstExpr *left = parseUnary(p);
 
-    while (match(p, TOKEN_STAR) || match(p, TOKEN_SLASH) || match(p, TOKEN_MODULO)) {
+    while (match(p, TOKEN_AS)) {
         TokenType operator = currentToken(p).type;
         advance(p);
 
         AstExpr* right = parseUnary(p);
+        if (isErr(right)) return right;
+
+        left = newBinaryExpr(right, mapToOperatorType(operator), left);
+    }
+
+    return left;
+}
+
+static AstExpr *parseFactor(Parser *p) {
+    AstExpr *left = parseAs(p);
+
+    while (match(p, TOKEN_STAR) || match(p, TOKEN_SLASH) || match(p, TOKEN_MODULO) || match(p, TOKEN_MOD)) {
+        TokenType operator = currentToken(p).type;
+        advance(p);
+
+        AstExpr* right = parseAs(p);
         if (isErr(right)) return right;
 
         left = newBinaryExpr(right, mapToOperatorType(operator), left);
@@ -513,14 +584,121 @@ static AstExpr *parseTerm(Parser *p) {
     return left;
 }
 
-static AstExpr *parseComparative(Parser *p) {
-    AstExpr *left = parseTerm(p);
+static AstExpr *parseBitwiseShifts(Parser *p) {
+    AstExpr* left = parseTerm(p);
 
-    while (match(p, TOKEN_LESS_THAN) || match(p, TOKEN_GREATER_THAN)) {
+    while (match(p, TOKEN_SHIFT_LEFT) || match(p, TOKEN_SHIFT_RIGHT)) {
         TokenType operator = currentToken(p).type;
         advance(p);
 
         AstExpr *right = parseTerm(p);
+
+        left = newBinaryExpr(right, mapToOperatorType(operator), left);
+    }
+
+    return left;
+}
+
+static AstExpr *parseComparative(Parser *p) {
+    AstExpr *left = parseBitwiseShifts(p);
+
+    while (match(p, TOKEN_LESS_THAN) || match(p, TOKEN_GREATER_THAN) || 
+        match(p, TOKEN_LESS_THAN_EQUALS) || match(p, TOKEN_GREATER_THAN_EQUALS)
+    ) {
+        TokenType operator = currentToken(p).type;
+        advance(p);
+
+        AstExpr *right = parseBitwiseShifts(p);
+
+        left = newBinaryExpr(right, mapToOperatorType(operator), left);
+    }
+
+    return left;
+}
+
+static AstExpr *parseRelationalEquality(Parser *p) {
+    AstExpr* left = parseComparative(p);
+
+    while (match(p, TOKEN_DOUBLE_EQUALS) || match(p, TOKEN_NOT_EQUALS)) {
+        TokenType operator = currentToken(p).type;
+        advance(p);
+
+        AstExpr *right = parseComparative(p);
+
+        left = newBinaryExpr(right, mapToOperatorType(operator), left);
+    }
+
+    return left;
+}
+
+static AstExpr *parseBitwiseAnd(Parser *p) {
+    AstExpr* left = parseRelationalEquality(p);
+
+    while (match(p, TOKEN_AMPERSAND)) {
+        TokenType operator = currentToken(p).type;
+        advance(p);
+
+        AstExpr *right = parseRelationalEquality(p);
+
+        left = newBinaryExpr(right, mapToOperatorType(operator), left);
+    }
+
+    return left;
+}
+
+static AstExpr *parseBitwiseXor(Parser *p) {
+    AstExpr* left = parseBitwiseAnd(p);
+
+    while (match(p, TOKEN_CARET) || match(p, TOKEN_XOR)) {
+        TokenType operator = currentToken(p).type;
+        advance(p);
+
+        AstExpr *right = parseBitwiseAnd(p);
+
+        left = newBinaryExpr(right, mapToOperatorType(operator), left);
+    }
+
+    return left;
+}
+
+static AstExpr *parseBitwiseOr(Parser *p) {
+    AstExpr* left = parseBitwiseXor(p);
+
+    while (match(p, TOKEN_PIPE)) {
+        TokenType operator = currentToken(p).type;
+        advance(p);
+
+        AstExpr *right = parseBitwiseXor(p);
+
+        left = newBinaryExpr(right, mapToOperatorType(operator), left);
+    }
+
+    return left;
+}
+
+static AstExpr *parseLogicalAnd(Parser *p) {
+    AstExpr* left = parseBitwiseOr(p);
+
+    while (match(p, TOKEN_AND)) {
+        TokenType operator = currentToken(p).type;
+        advance(p);
+
+        AstExpr *right = parseBitwiseOr(p);
+
+        left = newBinaryExpr(right, mapToOperatorType(operator), left);
+    }
+
+    return left;
+}
+
+static AstExpr *parseLogicalOr(Parser *p) {
+    AstExpr* left = parseLogicalAnd(p);
+
+    while (match(p, TOKEN_OR)) {
+        TokenType operator = currentToken(p).type;
+        advance(p);
+
+        AstExpr *right = parseLogicalAnd(p);
 
         left = newBinaryExpr(right, mapToOperatorType(operator), left);
     }
@@ -552,7 +730,7 @@ static AstExpr *parseTernary(Parser *p) {
         return newTernaryExpr(condition, falseExpr, trueExpr);
     }
 
-    return parseComparative(p);
+    return parseLogicalOr(p);
 }
 
 static AstExpr *parseExpr(Parser *p) {
@@ -648,6 +826,13 @@ static AstExpr *parseBlock(Parser *p) {
 }
 
 static AstExpr *parseFunction(Parser *p) {
+    bool isPublic = false;
+
+    if (match(p, TOKEN_PUB)) {
+        isPublic = true;
+        advance(p);
+    }
+
     advance(p);
 
     Token name = currentToken(p);
@@ -732,7 +917,7 @@ static AstExpr *parseFunction(Parser *p) {
     BlockExpr block = body ? body->asBlock : (BlockExpr){ .body = NULL, .count = 0 };
 
     AstExpr* functionDeclaration = newFunctionDeclaration(
-        name.lexeme, returnType->asType, block, paramCount, paramCapacity, parameters, isLambda, lambdaExpr
+        name.lexeme, returnType->asType, block, paramCount, paramCapacity, parameters, isLambda, lambdaExpr, isPublic
     );
 
     free(returnType);
@@ -751,7 +936,13 @@ static AstExpr *parseReturn(Parser *p) {
 }
 
 static AstExpr *parseStruct(Parser *p) {
+    bool isPublic = false;
     bool isInterface = false;
+
+    if (match(p, TOKEN_PUB)) {
+        advance(p);
+        isPublic = true;
+    }
 
     if (match(p, TOKEN_INTERFACE)) {
         advance(p);
@@ -815,7 +1006,7 @@ static AstExpr *parseStruct(Parser *p) {
         return error(p, "expected '}'");
     }
 
-    return newStructDeclaration(name.lexeme, members, memberCount, memberCapacity, isInterface);
+    return newStructDeclaration(name.lexeme, members, memberCount, memberCapacity, isInterface, isPublic);
 }
 
 static AstExpr *parseInterface(Parser *p) {
@@ -916,12 +1107,87 @@ static AstExpr *parseIdentifier(Parser *p) {
     return parseExpr(p);
 }
 
+static AstExpr *parsePub(Parser *p) {
+    advance(p);
+
+    if (match(p, TOKEN_FN)) {
+        recede(p);
+
+        return parseFunction(p);
+    } else if (match(p, TOKEN_STRUCT) || match(p, TOKEN_INTERFACE)) {
+        recede(p);
+
+        return parseStruct(p);
+    }
+
+    return parseExpr(p);
+}
+
+static AstExpr *parseFor(Parser *p) {
+    advance(p);
+    
+    Token name = currentToken(p);
+    if (!expect(p, TOKEN_IDENTIFIER)) {
+        return error(p, "expected identifier after 'for'");
+    }
+
+    if (!expect(p, TOKEN_IN)) {
+        return error(p, "expected 'in' after for loop condition");
+    }
+
+    AstExpr *iterator = parseExpr(p);
+    if (isErr(iterator)) return iterator;
+
+    if (!expect(p, TOKEN_LEFT_BRACE)) {
+        return error(p, "expected '{'");
+    }
+
+    AstExpr *block = parseBlock(p);
+    if (isErr(block)) return block;
+
+    if (!expect(p, TOKEN_RIGHT_BRACE)) {
+        return error(p, "expected '}'");
+    }
+
+    return newForStatement(name.lexeme, iterator, block->asBlock);
+}
+
+static AstExpr *parseIf(Parser *p) {
+    advance(p);
+
+    AstExpr *condition = parseExpr(p);
+    if (isErr(condition)) return condition;
+
+    if (!expect(p, TOKEN_LEFT_BRACE)) {
+        return error(p, "expected '{'");
+    }
+
+    AstExpr *block = parseBlock(p);
+    if (isErr(block)) return block;
+    
+    if (!expect(p, TOKEN_RIGHT_BRACE)) {
+        return error(p, "expected '}'");
+    }
+
+    return newIfStatement(condition, block->asBlock);
+}
+
+
 static AstExpr *parseStatement(Parser *p) {
     Token token = currentToken(p);
 
     switch (token.type) {
         case TOKEN_LET: {
             return parseLet(p);
+        }
+        case TOKEN_IF: {
+            return parseIf(p);
+        }
+        case TOKEN_PUB: {
+            return parsePub(p);
+        }
+        case TOKEN_FOR: {
+            return parseFor(p);
         }
         case TOKEN_STAR: {
             return parseAssignment(p);

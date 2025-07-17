@@ -200,6 +200,9 @@ static void analyzeExpr(Analyzer *analyzer, AstExpr *expr) {
             analyzeAssignExpr(analyzer, expr->asAssign);
             break;
         }
+        case AST_FOR: {
+            break;
+        }
         case AST_FUNCTION_DECLARATION: {
             analyzeFunctionDeclaration(analyzer, expr->asFunction);
             break;
@@ -221,6 +224,12 @@ static void analyzeExpr(Analyzer *analyzer, AstExpr *expr) {
             break;
         }
         case AST_UNARY: {
+            break;
+        }
+        case AST_BINARY: {
+            break;
+        }
+        case AST_TERNARY: {
             break;
         }
         case AST_CALL_EXPR: {
