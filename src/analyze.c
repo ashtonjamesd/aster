@@ -203,6 +203,12 @@ static void analyzeExpr(Analyzer *analyzer, AstExpr *expr) {
         case AST_FOR: {
             break;
         }
+        case AST_MATCH: {
+            break;
+        }
+        case AST_ENUM: {
+            break;
+        }
         case AST_FUNCTION_DECLARATION: {
             analyzeFunctionDeclaration(analyzer, expr->asFunction);
             break;

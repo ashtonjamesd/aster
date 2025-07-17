@@ -2,6 +2,8 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <sys/stat.h>
+#include <errno.h>
 
 #include "cli.h"
 #include "compile.h"
@@ -49,18 +51,80 @@ ExecResult runFromSource(char *path) {
 
 ExecResult runRepl() {
     fprintf(stderr, "REPL is currently not supported.");
+
     return EXEC_OK;
 }
 
-ExecResult runCli(int argc, char **argv) {
-    if (argc < 2) {
-        fprintf(stderr, "must specify an execution mode.\n");
+ExecResult runCreate(char *projectName) {
+    int status = mkdir("srcc", 0755);
+    if (status != 0 && errno != EEXIST) {
+        perror("error creating 'src' directory");
         return EXEC_FAIL;
     }
 
+    FILE *mainFptr = fopen("srcc/main.ast", "w");
+    if (!mainFptr) {
+        fprintf(stderr, "error creating 'main.ast'\n");
+        return EXEC_FAIL;
+    }
+    fprintf(mainFptr, "// this is the entry point to your application\n");
+    fprintf(mainFptr, "pub fn main(argc: i32, argv: **i8): i32 {\n");
+    fprintf(mainFptr, "\t// ..\n\n");
+    fprintf(mainFptr, "\treturn 0\n");
+    fprintf(mainFptr, "}");
+    fclose(mainFptr);
+
+    FILE *yamlFptr = fopen("aster.yaml", "w");
+    if (!yamlFptr) {
+        fprintf(stderr, "error creating 'aster.yaml'\n");
+        return EXEC_FAIL;
+    }
+    fprintf(yamlFptr, "project:\n");
+    fprintf(yamlFptr, "\tname: %s", projectName);
+
+    fclose(yamlFptr);
+
+    return EXEC_OK;
+}
+
+ExecResult runProject() {
+    FILE *fptr = fopen("aster.yaml", "r");
+    if (!fptr) {
+        fprintf(stderr, "unable to find 'aster.yaml'\n");
+        return EXEC_FAIL;
+    }
+    fclose(fptr);
+
+    char *source = readFile("srcc/main.ast");
+    if (!source) return EXEC_FAIL;
+
+    AsterConfig config = {
+        .lexerDebug = false,
+        .parserDebug = false,
+        .path = "srcc/main.ast"
+    };
+
+    AsterCompiler aster = newCompiler(source, config);
+    ExecResult result = compileToC(&aster);
+
+    return result;
+}
+
+ExecResult runCli(int argc, char **argv) {
     bool isRepl = false;
     bool isFile = false;
     char *path = NULL;
+
+    if (strcmp(argv[1], "create") == 0) {
+        if (argc < 3) {
+            fprintf(stderr, "usage: aster create <project_name>\n");
+            return EXEC_FAIL;
+        }
+
+        return runCreate(argv[2]);
+    } else if (strcmp(argv[1], "run") == 0) {
+        return runProject();
+    }
 
     for (int i = 0; i < argc; i++) {
         if (strcmp(argv[i], "--repl") == 0) {

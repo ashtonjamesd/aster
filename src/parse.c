@@ -60,6 +60,14 @@ static void freeExpr(AstExpr *expr) {
         case AST_BOOL_LITERAL: {
             break;
         }
+        case AST_ENUM: {
+            for (int i = 0; i < expr->asEnum.valueCount; i++) {
+                free(expr->asEnum.values[i]);
+            }
+            free(expr->asEnum.name);
+            free(expr->asEnum.values);
+            break;
+        }
         case AST_TERNARY: {
             freeExpr(expr->asTernary.condition);
             freeExpr(expr->asTernary.trueExpr);
@@ -106,6 +114,10 @@ static void freeExpr(AstExpr *expr) {
         case AST_BINARY: {
             freeExpr(expr->asBinary.left);
             freeExpr(expr->asBinary.right);
+            break;
+        }
+        case AST_MATCH: {
+            freeExpr(expr->asMatch.expression);
             break;
         }
         case AST_FUNCTION_DECLARATION: {
@@ -248,6 +260,23 @@ static void printExpr(AstExpr expr, int indent) {
             printExpr(*expr.asBinary.right, indent + 4);
             break;
         }
+        case AST_ENUM: {
+            printf("enum declaration:\n");
+
+            printIndent(indent + 2);
+            printf("name: %s\n", expr.asEnum.name);
+
+            printIndent(indent + 2);
+            printf("isPublic: %s\n", expr.asEnum.isPublic ? "true" : "false");
+
+            printIndent(indent + 2);
+            printf("values (%d):\n", expr.asEnum.valueCount);
+            for (int i = 0; i < expr.asEnum.valueCount; i++) {
+                printIndent(indent + 4);
+                printf("value: %s\n", expr.asEnum.values[i]);
+            }
+            break;
+        }
         case AST_LET: {
             printf("let declaration:\n");
             
@@ -264,6 +293,15 @@ static void printExpr(AstExpr expr, int indent) {
             printf("value:\n");
             printExpr(*expr.asLet.value, indent + 4);
             break;
+        }
+        case AST_MATCH: {
+            printf("match expression:\n");
+
+            printIndent(indent + 2);
+            printf("expression:\n");
+            printExpr(*expr.asMatch.expression, indent + 2);
+
+            break;   
         }
         case AST_ASSIGN_EXPR: {
             printf("assignment expression:\n");
@@ -844,7 +882,7 @@ static AstExpr *parseFunction(Parser *p) {
         return error(p, "expected '('");
     }
 
-    FunctionParameter *parameters = malloc(sizeof(FunctionParameter *));
+    FunctionParameter *parameters = malloc(sizeof(FunctionParameter));
     int paramCount = 0;
     int paramCapacity = 1;  
 
@@ -1040,6 +1078,14 @@ static AstExpr *parseWhile(Parser *p) {
     AstExpr *condition = parseExpr(p);
     if (isErr(condition)) return condition;
 
+    AstExpr *alteration = NULL;
+    if (match(p, TOKEN_COLON)) {
+        advance(p);
+
+        alteration = parseStatement(p);
+        if (isErr(alteration)) return alteration;
+    }
+
     if (!expect(p, TOKEN_LEFT_BRACE)) {
         return error(p, "expected '{'");
     }
@@ -1051,7 +1097,7 @@ static AstExpr *parseWhile(Parser *p) {
         return error(p, "expected '}'");
     }
 
-    return newWhileStatement(condition, block);
+    return newWhileStatement(condition, block, alteration);
 }
 
 static AstExpr *parseCallExpression(Parser *p) {
@@ -1107,6 +1153,55 @@ static AstExpr *parseIdentifier(Parser *p) {
     return parseExpr(p);
 }
 
+static AstExpr *parseEnum(Parser *p) {
+    bool isPublic = false;
+
+    if (match(p, TOKEN_PUB)) {
+        advance(p);
+        isPublic = true;
+    }
+
+    advance(p);
+
+    Token name = currentToken(p);
+    if (!expect(p, TOKEN_IDENTIFIER)) {
+        return error(p, "expected identifier");
+    }
+
+    if (!expect(p, TOKEN_LEFT_BRACE)) {
+        return error(p, "expected '{'");
+    }
+
+    char **values = malloc(sizeof(char *));
+    int valueCount = 0;
+    int valueCapacity = 1;
+
+    if (!match(p, TOKEN_RIGHT_BRACE)) {
+        recede(p);
+        do {
+            advance(p);
+
+            Token value = currentToken(p);
+            if (!expect(p, TOKEN_IDENTIFIER)) {
+                return error(p, "expected enum value");
+            }
+
+            if (valueCount >= valueCapacity) {
+                valueCapacity *= 2;
+                values = realloc(values, valueCapacity * sizeof(char *));
+            }
+            values[valueCount++] = strdup(value.lexeme);
+
+        } while(match(p, TOKEN_COMMA));
+    }
+
+    if (!expect(p, TOKEN_RIGHT_BRACE)) {
+        return error(p, "expected '}'");
+    }
+
+    return newEnumDeclaration(name.lexeme, values, valueCount, valueCapacity, isPublic);
+}
+
 static AstExpr *parsePub(Parser *p) {
     advance(p);
 
@@ -1118,6 +1213,10 @@ static AstExpr *parsePub(Parser *p) {
         recede(p);
 
         return parseStruct(p);
+    } else if (match(p, TOKEN_ENUM)) {
+        recede(p);
+
+        return parseEnum(p);
     }
 
     return parseExpr(p);
@@ -1172,6 +1271,60 @@ static AstExpr *parseIf(Parser *p) {
     return newIfStatement(condition, block->asBlock);
 }
 
+static AstExpr *parseMatch(Parser *p) {
+    advance(p);
+
+    AstExpr *expression = parseExpr(p);
+
+    if (!expect(p, TOKEN_LEFT_BRACE)) {
+        return error(p, "expected '{'");
+    }
+
+    MatchCaseExpr *cases = malloc(sizeof(MatchCaseExpr));
+    int caseCount = 0;
+    int caseCapacity = 1;
+
+    if (!match(p, TOKEN_RIGHT_BRACE)) {
+        recede(p);
+        do {
+            advance(p);
+
+            AstExpr *pattern = parseExpr(p);
+            if (isErr(pattern)) return pattern;
+
+            if (!expect(p, TOKEN_LAMBDA)) {
+                return error(p, "expected '=>'");
+            }
+
+            if (!expect(p, TOKEN_LEFT_BRACE)) {
+                return error(p, "expected '{'");
+            }
+
+            AstExpr *block = parseBlock(p);
+            if (isErr(block)) return block;
+
+            if (!expect(p, TOKEN_RIGHT_BRACE)) {
+                return error(p, "expected '}'");
+            }
+
+            AstExpr *caseExpr = newMatchCaseExpr(pattern, block->asBlock);
+            if (caseExpr->type != AST_MATCH_CASE) return caseExpr;
+
+            if (caseCount >= caseCapacity) {
+                caseCapacity *= 2;
+                cases = realloc(cases, caseCapacity * sizeof(MatchCaseExpr));
+            }
+            cases[caseCount++] = caseExpr->asMatchCase;
+
+        } while(match(p, TOKEN_COMMA));
+    }
+    
+    if (!expect(p, TOKEN_RIGHT_BRACE)) {
+        return error(p, "expected '}'");
+    }
+
+    return newMatchExpr(expression, cases, caseCount, caseCapacity);
+}
 
 static AstExpr *parseStatement(Parser *p) {
     Token token = currentToken(p);
@@ -1179,6 +1332,9 @@ static AstExpr *parseStatement(Parser *p) {
     switch (token.type) {
         case TOKEN_LET: {
             return parseLet(p);
+        }
+        case TOKEN_MATCH: {
+            return parseMatch(p);
         }
         case TOKEN_IF: {
             return parseIf(p);
@@ -1197,6 +1353,9 @@ static AstExpr *parseStatement(Parser *p) {
         }
         case TOKEN_FN: {
             return parseFunction(p);
+        }
+        case TOKEN_ENUM: {
+            return parseEnum(p);
         }
         case TOKEN_RETURN: {
             return parseReturn(p);

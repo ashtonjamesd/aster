@@ -155,11 +155,12 @@ AstExpr *newStructField(char *name, AstExpr *type) {
     return expr;
 }
 
-AstExpr *newWhileStatement(AstExpr *condition, AstExpr *block) {
+AstExpr *newWhileStatement(AstExpr *condition, AstExpr *block, AstExpr *alteration) {
     AstExpr *expr = newExpr(AST_WHILE);
     
     expr->asWhile.block = block->asBlock;
     expr->asWhile.condition = condition;
+    expr->asWhile.alteration = alteration;
 
     return expr;
 }
@@ -231,6 +232,38 @@ AstExpr *newIfStatement(AstExpr *condition, BlockExpr block) {
     
     expr->asIf.block = block;
     expr->asIf.condition = condition;
+
+    return expr;
+}
+
+AstExpr *newMatchExpr(AstExpr *expression, MatchCaseExpr *cases, int caseCount, int caseCapacity) {
+    AstExpr *expr = newExpr(AST_MATCH);
+
+    expr->asMatch.expression = expression;
+    expr->asMatch.cases = cases;
+    expr->asMatch.caseCapacity = caseCapacity;
+    expr->asMatch.caseCount = caseCount;
+
+    return expr;
+}
+
+AstExpr *newMatchCaseExpr(AstExpr *pattern, BlockExpr block) {
+    AstExpr *expr = newExpr(AST_MATCH_CASE);
+
+    expr->asMatchCase.pattern = pattern;
+    expr->asMatchCase.block = block;
+
+    return expr;
+}
+
+AstExpr *newEnumDeclaration(char *name, char **values, int valueCount, int valueCapacity, bool isPublic) {
+    AstExpr *expr = newExpr(AST_ENUM);
+
+    expr->asEnum.name = strdup(name);
+    expr->asEnum.values = values;
+    expr->asEnum.valueCount = valueCount;
+    expr->asEnum.valueCapacity = valueCapacity;
+    expr->asEnum.isPublic = isPublic;
 
     return expr;
 }

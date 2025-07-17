@@ -130,6 +130,8 @@ static void emitWhileStatement(Transpiler *t, WhileStatement whileStatement) {
         emitExpr(t, whileStatement.block.body[i]);
     }
 
+    emitExpr(t, whileStatement.alteration);
+
     emitRightBrace(t);
     emitNewline(t);
 }
@@ -325,14 +327,75 @@ static void emitCallExpr(Transpiler *t, CallExpr call) {
     emitRightParen(t);
 }
 
+static void emitMatchExpression(Transpiler *t, MatchExpr match) {
+    emit(t, "switch");
+    emitSpace(t);
+
+    emitLeftParen(t);
+    emitExpr(t, match.expression);
+    emitRightParen(t);
+    emitSpace(t);
+
+    emitLeftBrace(t);
+    emitNewline(t);
+
+    for (int i = 0; i < match.caseCount; i++) {
+        emit(t, "case ");
+        emitExpr(t, match.cases[i].pattern);
+
+        emit(t, ":");
+        emitNewline(t);
+
+        for (int j = 0; j < match.cases[i].block.count; j++) {
+            emitExpr(t, match.cases[i].block.body[j]);
+        }
+
+        emit(t, "break");
+        emitSemicolon(t);
+
+        emitNewline(t);
+    }
+
+    emitRightBrace(t);
+    emitNewline(t);
+}
+
+static void emitEnumDeclaration(Transpiler *t, EnumDeclaration enumDeclaration) {
+    emit(t, "enum");
+    emitSpace(t);
+
+    emit(t, enumDeclaration.name);
+    emitSpace(t);
+
+    emitLeftBrace(t);
+    emitNewline(t);
+    
+    for (int i = 0; i < enumDeclaration.valueCount; i++) {
+        emit(t, enumDeclaration.values[i]);
+        emitComma(t);
+        emitNewline(t);
+    }
+
+    emitRightBrace(t);
+    emitSemicolon(t);
+}
+
 static void emitExpr(Transpiler *t, AstExpr *expr) {
     switch (expr->type) {
         case AST_FUNCTION_DECLARATION: {
             emitFunctionDeclaration(t, expr->asFunction);
             break;
         }
+        case AST_ENUM: {
+            emitEnumDeclaration(t, expr->asEnum);
+            break;
+        }
         case AST_STRUCT_DECLARATION: {
             emitStructDeclaration(t, expr->asStruct);
+            break;
+        }
+        case AST_MATCH: {
+            emitMatchExpression(t, expr->asMatch);
             break;
         }
         case AST_LET: {

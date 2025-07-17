@@ -28,7 +28,9 @@ typedef enum {
     AST_TERNARY,
     AST_FOR,
     AST_IF,
-    
+    AST_MATCH,
+    AST_MATCH_CASE,
+    AST_ENUM,
     AST_ERR_EXPR,
 } AstType;
 
@@ -179,7 +181,8 @@ typedef struct {
 } ErrorExpr;
 
 typedef struct {
-    AstExpr *condition;
+    AstExpr  *condition;
+    AstExpr  *alteration;
     BlockExpr block;
 } WhileStatement;
 
@@ -202,6 +205,27 @@ typedef struct {
     AstExpr *trueExpr;
     AstExpr *falseExpr;
 } TernaryExpression;
+
+typedef struct {
+    AstExpr  *pattern;
+    BlockExpr block;
+} MatchCaseExpr;
+
+typedef struct {
+    char  *name;
+    int    valueCount;
+    int    valueCapacity;
+    char **values;
+    bool   isPublic;
+} EnumDeclaration;
+
+typedef struct {
+    AstExpr       *expression;
+
+    int            caseCount;
+    int            caseCapacity;
+    MatchCaseExpr *cases;
+} MatchExpr;
 
 struct AstExpr {
     AstType type;
@@ -232,6 +256,9 @@ struct AstExpr {
         TernaryExpression   asTernary;
         ForStatement        asFor;
         IfStatement         asIf;
+        MatchExpr           asMatch;
+        MatchCaseExpr       asMatchCase;
+        EnumDeclaration     asEnum;
     };
 };
 
@@ -251,7 +278,7 @@ AstExpr *newReturnStatement(AstExpr *expr);
 AstExpr *newFunctionParameter(char *name, AstExpr *type);
 AstExpr *newStructDeclaration(char *name, AstExpr **members, int memberCount, int memberCapacity, bool isInterface, bool isPublic);
 AstExpr *newStructField(char *name, AstExpr *type);
-AstExpr *newWhileStatement(AstExpr *condition, AstExpr *block);
+AstExpr *newWhileStatement(AstExpr *condition, AstExpr *alteration, AstExpr *block);
 AstExpr *newNextStatement();
 AstExpr *newStopStatement();
 AstExpr *newUnaryExpr(AstExpr *right, OperatorType operator);
@@ -260,6 +287,9 @@ AstExpr *newBinaryExpr(AstExpr *right, OperatorType operator, AstExpr *left);
 AstExpr *newTernaryExpr(AstExpr *condition, AstExpr *falseExpr, AstExpr *trueExpr);
 AstExpr *newForStatement(char *variable, AstExpr *iterator, BlockExpr block);
 AstExpr *newIfStatement(AstExpr *condition, BlockExpr block);
+AstExpr *newMatchExpr(AstExpr *expression, MatchCaseExpr *cases, int caseCount, int caseCapacity);
+AstExpr *newMatchCaseExpr(AstExpr *pattern, BlockExpr block);
+AstExpr *newEnumDeclaration(char *name, char **values, int valueCount, int valueCapacity, bool isPublic);
 
 AstExpr *newErrExpr();
 

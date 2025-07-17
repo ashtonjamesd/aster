@@ -60,6 +60,8 @@ static void initKeywords(Lexer *l) {
     newKeyword(l, "mod", TOKEN_MOD);
     newKeyword(l, "sizeof", TOKEN_SIZEOF);
     newKeyword(l, "as", TOKEN_AS);
+    newKeyword(l, "match", TOKEN_MATCH);
+    newKeyword(l, "enum", TOKEN_ENUM);
 }
 
 Lexer newLexer(char *filePath, char *source, bool debug) {
@@ -344,17 +346,31 @@ static void addToken(Token token, Lexer *l) {
 static void skipWhitespace(Lexer *l) {
     l->hadLeadingWhitespace = false;
 
-    while (isspace(currentChar(l))) {
-        l->hadLeadingWhitespace = true;
-        
-        if (currentChar(l) == '\n') {
-            l->line++;
-            l->column = 0;
+    while (true) {
+        char c = currentChar(l);
+
+        while (isspace(c)) {
+            l->hadLeadingWhitespace = true;
+            if (c == '\n') {
+                l->line++;
+                l->column = 0;
+            }
+            advance(l);
+            c = currentChar(l);
         }
 
-        advance(l);
+        if (c == '/' && l->position + 1 < l->sourceLength && l->source[l->position + 1] == '/') {
+            while (c != '\n' && !isEnd(l)) {
+                advance(l);
+                c = currentChar(l);
+            }
+            continue;
+        }
+
+        break;
     }
 }
+
 
 void tokenize(Lexer *l) {
     l->sourceLength = strlen(l->source);

@@ -26,6 +26,8 @@ typedef enum {
     TOKEN_MOD,
     TOKEN_SIZEOF,
     TOKEN_AS,
+    TOKEN_MATCH,
+    TOKEN_ENUM,
 
     TOKEN_SINGLE_EQUALS,
     TOKEN_COLON,
