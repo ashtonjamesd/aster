@@ -7,13 +7,13 @@
 
 static void analyzeExpr(Analyzer *analyzer, AstExpr *expr);
 
-void initScope(Scope *scope) {
+static void initScope(Scope *scope) {
     scope->symbols = malloc(sizeof(Symbol) * 1);
     scope->count = 0;
     scope->capacity = 1;
 }
 
-void pushScope(SymbolTable *table) {
+static void pushScope(SymbolTable *table) {
     if (table->depth >= table->capacity) {
         table->capacity *= 2;
         table->scopes = realloc(table->scopes, sizeof(Scope) * table->capacity);
@@ -22,11 +22,20 @@ void pushScope(SymbolTable *table) {
     initScope(&table->scopes[table->depth++]);
 }
 
-void popScope(SymbolTable *table) {
+static void popScope(SymbolTable *table) {
     if (table->depth == 0) return;
 
     Scope *top = &table->scopes[--table->depth];
     free(top->symbols);
+}
+
+void freeAnalyzer(Analyzer *analyzer) {
+    for (int i = 0; i < analyzer->table.depth; i++) {
+        Scope *scope = &analyzer->table.scopes[i];
+        free(scope->symbols);
+    }
+
+    free(analyzer->table.scopes);
 }
 
 Analyzer newAnalyzer(Parser *parser) {
@@ -96,12 +105,14 @@ static void analyzeFunctionDeclaration(Analyzer *analyzer, FunctionDeclaration f
         }
     }
 
-    for (int i = 0; i < function.block.count; i++) {
-        if (function.block.body[i]->type == AST_RETURN) {
-            // resolve return type
-        }
+    if (!function.isLambda) {
+        for (int i = 0; i < function.block.count; i++) {
+            if (function.block.body[i]->type == AST_RETURN) {
+                // resolve return type
+            }
 
-        analyzeExpr(analyzer, function.block.body[i]);
+            analyzeExpr(analyzer, function.block.body[i]);
+        }
     }
 
     popScope(&analyzer->table);

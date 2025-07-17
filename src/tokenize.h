@@ -26,6 +26,9 @@ typedef enum {
     TOKEN_MINUS,
     TOKEN_SLASH,
     TOKEN_MODULO,
+    TOKEN_LAMBDA,
+    TOKEN_LESS_THAN,
+    TOKEN_GREATER_THAN,
 
     TOKEN_INTEGER,
     TOKEN_FLOAT,
@@ -35,6 +38,9 @@ typedef enum {
     TOKEN_FALSE,
     TOKEN_WHILE,
     TOKEN_IDENTIFIER,
+    TOKEN_IF,
+    TOKEN_THEN,
+    TOKEN_ELSE,
 
     TOKEN_EOF,
     TOKEN_BAD,

@@ -48,6 +48,12 @@ OperatorType mapToOperatorType(TokenType type) {
         case TOKEN_MINUS: {
             return OP_MINUS;
         }
+        case TOKEN_LESS_THAN: {
+            return OP_LESS_THAN;
+        }
+        case TOKEN_GREATER_THAN: {
+            return OP_GREATER_THAN;
+        }
         default: {
             exitWithInternalCompilerError("unable to map to operator type");
 
@@ -70,6 +76,12 @@ char *mapOperatorType(OperatorType type) {
         }
         case OP_MINUS: {
             return "-";
+        }
+        case OP_LESS_THAN: {
+            return "<";
+        }
+        case OP_GREATER_THAN: {
+            return ">";
         }
         default: {
             exitWithInternalCompilerError("unable to map to operator type");

@@ -1,4 +1,14 @@
 fn main(): u0 {
+    return zero() + one() + abs(-5)
+}
 
-    return 2 * 2
+struct math {
+    fn zero(): u8 => 0
+    fn one(): u8 => 1
+
+    fn square(a: u8, b: u8): u8 => a * b
+
+    fn abs(x: u8): u8 {
+        return if x < 0 then -x else x
+    }
 }

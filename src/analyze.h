@@ -32,6 +32,8 @@ typedef struct {
 
 
 Analyzer newAnalyzer(Parser *parser);
+void freeAnalyzer(Analyzer *analyzer);
+
 void analyze(Analyzer *analyzer);
 
 #endif

@@ -47,6 +47,9 @@ static void initKeywords(Lexer *l) {
     newKeyword(l, "while", TOKEN_WHILE);
     newKeyword(l, "next", TOKEN_NEXT);
     newKeyword(l, "stop", TOKEN_STOP);
+    newKeyword(l, "if", TOKEN_IF);
+    newKeyword(l, "then", TOKEN_THEN);
+    newKeyword(l, "else", TOKEN_ELSE);
 }
 
 Lexer newLexer(char *filePath, char *source, bool debug) {
@@ -184,7 +187,14 @@ static Token tokenizeSymbol(Lexer *l) {
     advance(l);
 
     switch (c) {
-        case '=': return newToken("=", TOKEN_SINGLE_EQUALS, l);
+        case '=': {
+            if (currentChar(l) == '>') {
+                advance(l);
+                return newToken("=>", TOKEN_LAMBDA, l);
+            }
+
+            return newToken("=", TOKEN_SINGLE_EQUALS, l);
+        }
         case ':': return newToken(":", TOKEN_COLON, l);
         case '*': return newToken("*", TOKEN_STAR, l);
         case '(': return newToken("(", TOKEN_LEFT_PAREN, l);
@@ -197,6 +207,8 @@ static Token tokenizeSymbol(Lexer *l) {
         case '-': return newToken("-", TOKEN_MINUS, l);
         case '/': return newToken("/", TOKEN_SLASH, l);
         case '%': return newToken("%", TOKEN_MODULO, l);
+        case '>': return newToken(">", TOKEN_GREATER_THAN, l);
+        case '<': return newToken("<", TOKEN_LESS_THAN, l);
         default:  return badToken(l);
     }
 }

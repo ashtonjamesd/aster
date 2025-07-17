@@ -25,6 +25,7 @@ typedef enum {
     AST_UNARY,
     AST_CALL_EXPR,
     AST_BINARY,
+    AST_TERNARY,
     
     AST_ERR_EXPR,
 } AstType;
@@ -34,10 +35,12 @@ typedef enum {
     OP_DEREF,
     OP_PLUS,
     OP_MINUS,
+    OP_LESS_THAN,
+    OP_GREATER_THAN,
 } OperatorType;
 
 typedef struct {
-    int value;
+    long value;
 } IntegerLiteralExpr;
 
 typedef struct {
@@ -115,6 +118,9 @@ typedef struct {
     int                paramCount;
     int                paramCapacity;
     FunctionParameter *parameters;
+
+    bool               isLambda;
+    AstExpr           *lambdaExpr;
 } FunctionDeclaration;
 
 typedef struct {
@@ -123,12 +129,12 @@ typedef struct {
 } StructField;
 
 typedef struct {
-    char        *name;
-    bool         isInterface;
+    char     *name;
+    bool      isInterface;
 
-    int          fieldCount;
-    int          fieldCapacity;
-    StructField *fields;
+    int       memberCount;
+    int       memberCapacity;
+    AstExpr **members;
 } StructDeclaration;
 
 typedef struct {
@@ -151,6 +157,12 @@ typedef struct {
 typedef struct {
     char dummy;
 } StopStatement;
+
+typedef struct {
+    AstExpr *condition;
+    AstExpr *trueExpr;
+    AstExpr *falseExpr;
+} TernaryExpression;
 
 struct AstExpr {
     AstType type;
@@ -178,6 +190,7 @@ struct AstExpr {
         UnaryExpr           asUnary;
         CallExpr            asCallExpr;
         BinaryExpr          asBinary;
+        TernaryExpression   asTernary;
     };
 };
 
@@ -191,11 +204,11 @@ AstExpr *newBoolExpr(bool value);
 AstExpr *newLetDeclaration(char *name, AstExpr *type, AstExpr *value);
 AstExpr *newTypeExpr(char *name, uint8_t ptrDepth);
 AstExpr *newAssignExpr(char *name, AstExpr *value, uint8_t ptrDepth);
-AstExpr *newFunctionDeclaration(char *name, AstExpr *returnType, AstExpr *body, int paramCount, int paramCapacity, FunctionParameter *parameters);
+AstExpr *newFunctionDeclaration(char *name, TypeExpr returnType, BlockExpr body, int paramCount, int paramCapacity, FunctionParameter *parameters, bool isLambda, AstExpr *lambdaExpr);
 AstExpr *newBlockExpr(AstExpr **body, int count, int capacity);
 AstExpr *newReturnStatement(AstExpr *expr);
 AstExpr *newFunctionParameter(char *name, AstExpr *type);
-AstExpr *newStructDeclaration(char *name, StructField *fields, int fieldCount, int fieldCapacity, bool isInterface);
+AstExpr *newStructDeclaration(char *name, AstExpr **members, int memberCount, int memberCapacity, bool isInterface);
 AstExpr *newStructField(char *name, AstExpr *type);
 AstExpr *newWhileStatement(AstExpr *condition, AstExpr *block);
 AstExpr *newNextStatement();
@@ -203,6 +216,7 @@ AstExpr *newStopStatement();
 AstExpr *newUnaryExpr(AstExpr *right, OperatorType operator);
 AstExpr *newCallExpr(char *name, int argCount, int argCapacity, AstExpr **arguments);
 AstExpr *newBinaryExpr(AstExpr *right, OperatorType operator, AstExpr *left);
+AstExpr *newTernaryExpr(AstExpr *condition, AstExpr *falseExpr, AstExpr *trueExpr);
 
 AstExpr *newErrExpr();
 

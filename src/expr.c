@@ -90,15 +90,17 @@ AstExpr *newAssignExpr(char *name, AstExpr *value, uint8_t ptrDepth) {
     return expr;
 }
 
-AstExpr *newFunctionDeclaration(char *name, AstExpr *returnType, AstExpr *body, int paramCount, int paramCapacity, FunctionParameter *parameters) {
+AstExpr *newFunctionDeclaration(char *name, TypeExpr returnType, BlockExpr body, int paramCount, int paramCapacity, FunctionParameter *parameters, bool isLambda, AstExpr *lambdaExpr) {
     AstExpr *expr = newExpr(AST_FUNCTION_DECLARATION);
 
     expr->asFunction.name = strdup(name);
-    expr->asFunction.returnType = returnType->asType;
-    expr->asFunction.block = body->asBlock;
+    expr->asFunction.returnType = returnType;
+    expr->asFunction.block = body;
     expr->asFunction.paramCapacity = paramCapacity;
     expr->asFunction.paramCount = paramCount;
     expr->asFunction.parameters = parameters;
+    expr->asFunction.isLambda = isLambda;
+    expr->asFunction.lambdaExpr = lambdaExpr;
 
     return expr;
 }
@@ -130,13 +132,13 @@ AstExpr *newFunctionParameter(char *name, AstExpr *type) {
     return expr;
 }
 
-AstExpr *newStructDeclaration(char *name, StructField *fields, int fieldCount, int fieldCapacity, bool isInterface) {
+AstExpr *newStructDeclaration(char *name, AstExpr **members, int memberCount, int memberCapacity, bool isInterface) {
     AstExpr *expr = newExpr(AST_STRUCT_DECLARATION);
     expr->asStruct.name = strdup(name);
 
-    expr->asStruct.fields = fields;
-    expr->asStruct.fieldCapacity = fieldCapacity;
-    expr->asStruct.fieldCount = fieldCount;
+    expr->asStruct.members = members;
+    expr->asStruct.memberCapacity = memberCapacity;
+    expr->asStruct.memberCount = memberCount;
     expr->asStruct.isInterface = isInterface;
 
     return expr;
@@ -198,6 +200,16 @@ AstExpr *newBinaryExpr(AstExpr *right, OperatorType operator, AstExpr *left) {
     expr->asBinary.right = right;
     expr->asBinary.operator = operator;
     expr->asBinary.left = left;
+
+    return expr;
+}
+
+AstExpr *newTernaryExpr(AstExpr *condition, AstExpr *falseExpr, AstExpr *trueExpr) {
+    AstExpr *expr = newExpr(AST_TERNARY);
+
+    expr->asTernary.condition = condition;
+    expr->asTernary.trueExpr = trueExpr;
+    expr->asTernary.falseExpr = falseExpr;
 
     return expr;
 }

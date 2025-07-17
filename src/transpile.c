@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "transpile.h"
 #include "map.h"
@@ -84,8 +85,17 @@ static void emitFunctionDeclaration(Transpiler *t, FunctionDeclaration function)
     emitLeftBrace(t);
     emitNewline(t);
 
-    for (int i = 0; i < function.block.count; i++) {
-        emitExpr(t, function.block.body[i]);
+    if (!function.isLambda) {
+        for (int i = 0; i < function.block.count; i++) {
+            emitExpr(t, function.block.body[i]);
+        }
+    } else {
+        emit(t, "return");
+        emitSpace(t);
+        emitExpr(t, function.lambdaExpr);
+        
+        emitSemicolon(t);
+        emitNewline(t);
     }
 
     // emitNewline(t);
@@ -148,21 +158,44 @@ static void emitStructDeclaration(Transpiler *t, StructDeclaration structDeclara
     emitLeftBrace(t);
     emitNewline(t);
 
-    if (structDeclaration.fieldCount == 0) {
+    int fieldCount = 0;
+    for (int i = 0; i < structDeclaration.memberCount; i++) {
+        if (structDeclaration.members[i]->type == AST_STRUCT_FIELD) fieldCount++;
+    }
+    if (fieldCount == 0) {
         emit(t, "char dummy;");
     }
 
-    for (int i = 0; i < structDeclaration.fieldCount; i++) {
-        emitTypeExpression(t, structDeclaration.fields[i].type);
-        emit(t, structDeclaration.fields[i].name);
+    int *fnIndexs = malloc(sizeof(int));
+    int fnIndexCapacity = 1;
+    int fnIndexCount = 0;
 
-        emitSemicolon(t);
+    for (int i = 0; i < structDeclaration.memberCount; i++) {
+        if (structDeclaration.members[i]->type == AST_FUNCTION_DECLARATION) {            
+            if (fnIndexCount >= fnIndexCapacity) {
+                fnIndexCapacity *= 2;
+                fnIndexs = realloc(fnIndexs, sizeof(int) * fnIndexCapacity);
+            }
+
+            fnIndexs[fnIndexCount++] = i;
+            continue;
+        }
+
+        emitExpr(t, structDeclaration.members[i]);
+
+        // emitSemicolon(t);
         emitNewline(t);
     }
 
     emitNewline(t);
     emitRightBrace(t);
     emitSemicolon(t);
+
+    for (int i = 0; i < fnIndexCount; i++) {
+        emitExpr(t, structDeclaration.members[fnIndexs[i]]);
+    }
+
+    free(fnIndexs);
 
     emitNewline(t);
 }
@@ -180,7 +213,7 @@ static void emitAssignExpression(Transpiler *t, AssignmentExpr assign) {
 }
 
 static void emitIntegerLiteral(Transpiler *t, IntegerLiteralExpr integer) {
-    fprintf(t->fptr, "%d", integer.value);
+    fprintf(t->fptr, "%ld", integer.value);
 }
 
 static void emitFloatLiteral(Transpiler *t, FloatLiteralExpr floatLiteral) {
@@ -201,6 +234,15 @@ static void emitBoolLiteral(Transpiler *t, BoolLiteralExpr boolLiteral) {
 
 static void emitIdentifier(Transpiler *t, IdentifierExpr identifier) {
     emit(t, identifier.name);
+}
+
+static void emitTernary(Transpiler *t, TernaryExpression ternary) {
+    emitExpr(t, ternary.condition);
+    emit(t, " ? ");
+    emitExpr(t, ternary.trueExpr);
+    emit(t, " : ");
+    emitExpr(t, ternary.falseExpr);
+    emitSemicolon(t);
 }
 
 static void emitNext(Transpiler *t, NextStatement next) {
@@ -243,9 +285,6 @@ static void emitCallExpr(Transpiler *t, CallExpr call) {
         }
     }
     emitRightParen(t);
-
-    // TODO: call expression as a statement won't need ';'
-    emitSemicolon(t);
 }
 
 static void emitExpr(Transpiler *t, AstExpr *expr) {
@@ -316,6 +355,10 @@ static void emitExpr(Transpiler *t, AstExpr *expr) {
         }
         case AST_BOOL_LITERAL: {
             emitBoolLiteral(t, expr->asBool);
+            break;
+        }
+        case AST_TERNARY: {
+            emitTernary(t, expr->asTernary);
             break;
         }
         default: {

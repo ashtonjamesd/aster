@@ -9,6 +9,13 @@
 
 static AstExpr *parseStatement(Parser *p);
 static AstExpr *parseExpr(Parser *p);
+static AstExpr *parseCallExpression(Parser *p);
+
+
+static AstExpr *error(Parser *p, char *err) {
+    compileErrFromParse(p, err);
+    return newErrExpr();
+}
 
 Parser newParser(char *filePath, Token *tokens, int tokenCount, bool debug) {
     Parser p;
@@ -22,7 +29,7 @@ Parser newParser(char *filePath, Token *tokens, int tokenCount, bool debug) {
     p.ast = (Ast){
         .exprCapacity = 1,
         .exprCount = 0,
-        .exprs = malloc(sizeof(AstExpr))
+        .exprs = malloc(sizeof(AstExpr *))
     };
 
     p.hadErr = false;
@@ -32,6 +39,8 @@ Parser newParser(char *filePath, Token *tokens, int tokenCount, bool debug) {
 }
 
 static void freeExpr(AstExpr *expr) {
+    if (!expr) return;
+
     switch (expr->type) {
         case AST_NEXT: {
             break;
@@ -49,6 +58,12 @@ static void freeExpr(AstExpr *expr) {
             break;
         }
         case AST_BOOL_LITERAL: {
+            break;
+        }
+        case AST_TERNARY: {
+            freeExpr(expr->asTernary.condition);
+            freeExpr(expr->asTernary.trueExpr);
+            freeExpr(expr->asTernary.falseExpr);
             break;
         }
         case AST_CALL_EXPR: {
@@ -96,20 +111,27 @@ static void freeExpr(AstExpr *expr) {
         case AST_FUNCTION_DECLARATION: {
             free(expr->asFunction.name);
             free(expr->asFunction.returnType.name);
-            for (int i = 0; i < expr->asFunction.block.count; i++) {
-                freeExpr(expr->asFunction.block.body[i]);
+
+            if (!expr->asFunction.isLambda) {
+                for (int i = 0; i < expr->asFunction.block.count; i++) {
+                    freeExpr(expr->asFunction.block.body[i]);
+                }
+                free(expr->asFunction.block.body);
+            } else {
+                freeExpr(expr->asFunction.lambdaExpr);
             }
+
             for (int i = 0; i < expr->asFunction.paramCount; i++) {
                 free(expr->asFunction.parameters[i].name);
                 free(expr->asFunction.parameters[i].type.name);
             }
+            free(expr->asFunction.parameters);
             break;
         }
         case AST_STRUCT_DECLARATION: {
             free(expr->asStruct.name);
-            for (int i = 0; i < expr->asStruct.fieldCount; i++) {
-                free(expr->asStruct.fields[i].name);
-                free(expr->asStruct.fields[i].type.name);
+            for (int i = 0; i < expr->asStruct.memberCount; i++) {
+                freeExpr(expr->asStruct.members[i]);
             }
             break;
         }
@@ -149,7 +171,7 @@ static void printExpr(AstExpr expr, int indent) {
 
     switch (expr.type) {
         case AST_INTEGER_LITERAL: {
-            printf("integer literal: %d\n", expr.asInteger.value);
+            printf("integer literal: %ld\n", expr.asInteger.value);
             break;
         }
         case AST_BOOL_LITERAL: {
@@ -262,10 +284,16 @@ static void printExpr(AstExpr expr, int indent) {
                 printf("%s\n", param.type.name);
             }
             
-            printIndent(indent + 2);
-            printf("body (%d):\n", expr.asFunction.block.count);
-            for (int i = 0; i < expr.asFunction.block.count; i++) {
-                printExpr(*expr.asFunction.block.body[i], indent + 2);
+            if (!expr.asFunction.isLambda) {
+                printIndent(indent + 2);
+                printf("body (%d):\n", expr.asFunction.block.count);
+                for (int i = 0; i < expr.asFunction.block.count; i++) {
+                    printExpr(*expr.asFunction.block.body[i], indent + 2);
+                }
+            } else {
+                printIndent(indent + 2);
+                printf("lambda: ");
+                printExpr(*expr.asFunction.lambdaExpr, indent + 2);
             }
 
             break;
@@ -302,16 +330,39 @@ static void printExpr(AstExpr expr, int indent) {
             printf("interface: %s\n", expr.asStruct.isInterface ? "true" : "false");
 
             printIndent(indent + 2);
-            printf("fields (%d):\n", expr.asStruct.fieldCount);
-            for (int i = 0; i < expr.asStruct.fieldCount; i++) {
-                printIndent(indent + 4);
-                printf("name: ");
-                printf("%s\n", expr.asStruct.fields[i].name);
-                printIndent(indent + 4);
-                printf("type: ");
-                for (int i = 0; i < expr.asStruct.fields[i].type.ptrDepth; i++) printf("*");
-                printf("%s\n", expr.asStruct.fields[i].type.name);
+            printf("members (%d):\n", expr.asStruct.memberCount);
+            for (int i = 0; i < expr.asStruct.memberCount; i++) {
+                printExpr(*expr.asStruct.members[i], indent + 4);
             }
+            break;
+        }
+        case AST_CALL_EXPR: {
+            printf("call expression:\n");
+
+            printIndent(indent + 2);
+            printf("name: %s\n", expr.asCallExpr.name);
+
+            printIndent(indent + 2);
+            printf("arguments (%d):\n", expr.asCallExpr.argCount);
+            for (int i = 0; i < expr.asCallExpr.argCount; i++) {
+                printExpr(*expr.asCallExpr.arguments[i], indent + 4);
+            }
+            break;
+        }
+        case AST_TERNARY: {
+            printf("ternary expression:\n");
+
+            printIndent(indent + 2);
+            printf("condition:\n");
+            printExpr(*expr.asTernary.condition, indent + 4);
+
+            printIndent(indent + 2);
+            printf("true expression:\n");
+            printExpr(*expr.asTernary.trueExpr, indent + 4);
+
+            printIndent(indent + 2);
+            printf("false expression:\n");
+            printExpr(*expr.asTernary.falseExpr, indent + 4);
             break;
         }
         default: {
@@ -369,12 +420,18 @@ static AstExpr *parsePrimary(Parser *p) {
 
     switch (token.type) {
         case TOKEN_INTEGER: {
-            return newIntegerExpr(atoi(token.lexeme));
+            return newIntegerExpr(atol(token.lexeme));
         }
         case TOKEN_FLOAT: {
             return newFloatExpr(atof(token.lexeme));
         }
         case TOKEN_IDENTIFIER: {
+            if (match(p, TOKEN_LEFT_PAREN)) {
+                recede(p);
+
+                return parseCallExpression(p);
+            }
+
             return newIdentifierExpr(token.lexeme);
         }
         case TOKEN_CHAR: {
@@ -410,14 +467,28 @@ static AstExpr *parsePointerOp(Parser *p) {
     return parsePrimary(p);
 }
 
+static AstExpr *parseUnary(Parser *p) {
+    while (match(p, TOKEN_MINUS) || match(p, TOKEN_PLUS)) {
+        TokenType operator = currentToken(p).type;
+        advance(p);
+
+        AstExpr *right = parsePointerOp(p);
+        if (isErr(right)) return right;
+
+        return newUnaryExpr(right, mapToOperatorType(operator));
+    }
+
+    return parsePointerOp(p);
+}
+
 static AstExpr *parseFactor(Parser *p) {
-    AstExpr *left = parsePointerOp(p);
+    AstExpr *left = parseUnary(p);
 
     while (match(p, TOKEN_STAR) || match(p, TOKEN_SLASH) || match(p, TOKEN_MODULO)) {
         TokenType operator = currentToken(p).type;
         advance(p);
 
-        AstExpr* right = parsePointerOp(p);
+        AstExpr* right = parseUnary(p);
         if (isErr(right)) return right;
 
         left = newBinaryExpr(right, mapToOperatorType(operator), left);
@@ -442,14 +513,50 @@ static AstExpr *parseTerm(Parser *p) {
     return left;
 }
 
-static AstExpr *parseExpr(Parser *p) {
-    return parseTerm(p);
+static AstExpr *parseComparative(Parser *p) {
+    AstExpr *left = parseTerm(p);
+
+    while (match(p, TOKEN_LESS_THAN) || match(p, TOKEN_GREATER_THAN)) {
+        TokenType operator = currentToken(p).type;
+        advance(p);
+
+        AstExpr *right = parseTerm(p);
+
+        left = newBinaryExpr(right, mapToOperatorType(operator), left);
+    }
+
+    return left;
 }
 
+static AstExpr *parseTernary(Parser *p) {
+    if (match(p, TOKEN_IF)) {
+        advance(p);
 
-static AstExpr *error(Parser *p, char *err) {
-    compileErrFromParse(p, err);
-    return newErrExpr();
+        AstExpr *condition = parseExpr(p);
+        if (isErr(condition)) return condition;
+
+        if (!expect(p, TOKEN_THEN)) {
+            return error(p, "expected 'then' after ternary condition");
+        }
+
+        AstExpr *trueExpr = parseExpr(p);
+        if (isErr(trueExpr)) return trueExpr;
+        
+        if (!expect(p, TOKEN_ELSE)) {
+            return error(p, "expected 'else' then ternary false expression");
+        }
+
+        AstExpr *falseExpr = parseExpr(p);
+        if (isErr(falseExpr)) return falseExpr;
+
+        return newTernaryExpr(condition, falseExpr, trueExpr);
+    }
+
+    return parseComparative(p);
+}
+
+static AstExpr *parseExpr(Parser *p) {
+    return parseTernary(p);
 }
 
 static AstExpr *parseType(Parser *p) {
@@ -596,18 +703,42 @@ static AstExpr *parseFunction(Parser *p) {
     AstExpr *returnType = parseType(p);
     if (returnType->type != AST_TYPE_EXPR) return returnType;
 
-    if (!expect(p, TOKEN_LEFT_BRACE)) {
+    AstExpr *lambdaExpr = NULL;
+    bool isLambda = false;
+
+    if (match(p, TOKEN_LAMBDA)) {
+        advance(p);
+
+        lambdaExpr = parseExpr(p);
+        if (isErr(lambdaExpr)) return lambdaExpr;
+
+        isLambda = true;
+    }
+
+    if (!isLambda && !expect(p, TOKEN_LEFT_BRACE)) {
         return error(p, "expected '{'");
     }
 
-    AstExpr *body = parseBlock(p);
-    if (isErr(body)) return body;
+    AstExpr *body = NULL;
+    if (!isLambda) {
+        body = parseBlock(p);
+        if (isErr(body)) return body;
 
-    if (!expect(p, TOKEN_RIGHT_BRACE)) {
-        return error(p, "expected '}'");
+        if (!expect(p, TOKEN_RIGHT_BRACE)) {
+            return error(p, "expected '}'");
+        }
     }
+    
+    BlockExpr block = body ? body->asBlock : (BlockExpr){ .body = NULL, .count = 0 };
 
-    return newFunctionDeclaration(name.lexeme, returnType, body, paramCount, paramCapacity, parameters);
+    AstExpr* functionDeclaration = newFunctionDeclaration(
+        name.lexeme, returnType->asType, block, paramCount, paramCapacity, parameters, isLambda, lambdaExpr
+    );
+
+    free(returnType);
+    if (body) free(body);
+
+    return functionDeclaration;
 }
 
 static AstExpr *parseReturn(Parser *p) {
@@ -637,54 +768,54 @@ static AstExpr *parseStruct(Parser *p) {
         return error(p, "expected '{'");
     }
 
-    StructField *fields = malloc(sizeof(StructField));
-    int fieldCount = 0;
-    int fieldCapacity = 1;
+    AstExpr **members = malloc(sizeof(AstExpr *));
+    int memberCount = 0;
+    int memberCapacity = 1;
 
     if (!match(p, TOKEN_RIGHT_BRACE)) {
-        recede(p);
         do {
             // handles leading commas
-            if (match(p, TOKEN_COMMA)) {
-                advance(p);
-                if (match(p, TOKEN_RIGHT_BRACE)) {
-                    break;
-                } else {
-                    recede(p);
-                }
-            }
+            // if (match(p, TOKEN_COMMA)) {
+            //     advance(p);
+            //     if (match(p, TOKEN_RIGHT_BRACE)) {
+            //         break;
+            //     } else {
+            //         recede(p);
+            //     }
+            // }
 
-            advance(p);
+            AstExpr *member = parseStatement(p);
+            if (isErr(member)) return member;
 
-            Token fieldName = currentToken(p);
-            if (!expect(p, TOKEN_IDENTIFIER)) {
-                return error(p, "expected identifier");
-            }
+            // Token fieldName = currentToken(p);
+            // if (!expect(p, TOKEN_IDENTIFIER)) {
+            //     return error(p, "expected identifier");
+            // }
 
-            if (!expect(p, TOKEN_COLON)) {
-                return error(p, "expected ':'");
-            }
+            // if (!expect(p, TOKEN_COLON)) {
+            //     return error(p, "expected ':'");
+            // }
 
-            AstExpr *type = parseType(p);
-            if (isErr(type)) return type;
+            // AstExpr *type = parseType(p);
+            // if (isErr(type)) return type;
 
-            AstExpr *field = newStructField(fieldName.lexeme, type);
+            // AstExpr *field = newStructField(fieldName.lexeme, type);
 
-            if (fieldCount >= fieldCapacity) {
-                fieldCapacity *= 2;
-                fields = realloc(fields, sizeof(StructField) * fieldCapacity);
+            if (memberCount >= memberCapacity) {
+                memberCapacity *= 2;
+                members = realloc(members, sizeof(AstExpr *) * memberCapacity);
             }
             
-            fields[fieldCount++] = field->asStructField;
+            members[memberCount++] = member;
 
-        } while (match(p, TOKEN_COMMA));
+        } while (!match(p, TOKEN_RIGHT_BRACE));
     }
 
     if (!expect(p, TOKEN_RIGHT_BRACE)) {
         return error(p, "expected '}'");
     }
 
-    return newStructDeclaration(name.lexeme, fields, fieldCount, fieldCapacity, isInterface);
+    return newStructDeclaration(name.lexeme, members, memberCount, memberCapacity, isInterface);
 }
 
 static AstExpr *parseInterface(Parser *p) {
@@ -828,7 +959,7 @@ static AstExpr *parseStatement(Parser *p) {
 void addExpr(AstExpr *expr, Parser *p) {
     if (p->ast.exprCount >= p->ast.exprCapacity) {
         p->ast.exprCapacity *= 2;
-        p->ast.exprs = realloc(p->ast.exprs, sizeof(AstExpr) * p->ast.exprCapacity);
+        p->ast.exprs = realloc(p->ast.exprs, sizeof(AstExpr *) * p->ast.exprCapacity);
     }
 
     p->ast.exprs[p->ast.exprCount++] = expr;

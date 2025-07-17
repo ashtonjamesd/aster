@@ -31,6 +31,7 @@ ExecResult compileToC(AsterCompiler *compiler) {
         compiler->config.path, lexer.tokens, lexer.tokenCount, 
         compiler->config.parserDebug
     );
+
     parse(&parser);
 
     if (parser.hadErr) {
@@ -46,6 +47,7 @@ ExecResult compileToC(AsterCompiler *compiler) {
     if (analyzer.hadErr) {
         freeParser(&parser);
         freeLexer(&lexer);
+        freeAnalyzer(&analyzer);
 
         return EXEC_COMPILE_ERR;
     }
@@ -59,8 +61,9 @@ ExecResult compileToC(AsterCompiler *compiler) {
     Transpiler transpiler = newTranspiler(fptr, parser.ast);
     transpile(&transpiler);
 
-    freeParser(&parser);
     freeLexer(&lexer);
+    freeParser(&parser);
+    freeAnalyzer(&analyzer);
     
     return EXEC_OK;
 }
