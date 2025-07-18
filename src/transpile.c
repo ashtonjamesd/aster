@@ -103,7 +103,60 @@ static void emitFunctionDeclaration(Transpiler *t, FunctionDeclaration function)
     emitNewline(t);
 }
 
+static void emitReturnMatch(Transpiler *t, MatchExpr match) {
+    emit(t, "switch");
+    emitSpace(t);
+
+    emitLeftParen(t);
+    emitExpr(t, match.expression);
+    emitRightParen(t);
+    emitSpace(t);
+
+    emitLeftBrace(t);
+    emitNewline(t);
+
+    for (int i = 0; i < match.caseCount; i++) {
+        if (match.cases[i].isElseCase) {
+            emit(t, "default");
+            emit(t, ":");
+            emitNewline(t);
+
+            emit(t, "return");
+            emitSpace(t);
+            emitExpr(t, match.cases[i].expression);
+            emitSemicolon(t);
+            continue;
+        }
+
+        emit(t, "case");
+        emitSpace(t);
+        emitExpr(t, match.cases[i].pattern);
+
+        emit(t, ":");
+        emitNewline(t);
+
+        emit(t, "return");
+        emitSpace(t);
+        emitExpr(t, match.cases[i].expression);
+        emitSemicolon(t);
+
+        emitNewline(t);
+        emit(t, "break");
+        emitSemicolon(t);
+
+        emitNewline(t);
+    }
+
+    emitRightBrace(t);
+    emitNewline(t);
+}
+
 static void emitReturnStatement(Transpiler *t, ReturnStatement returnStatement) {
+    if (returnStatement.value->type == AST_MATCH) {
+        emitReturnMatch(t, returnStatement.value->asMatch);
+        return;
+    }
+
     emit(t, "return");
     emitSpace(t);
 
@@ -141,8 +194,54 @@ static void emitForStatement(Transpiler *t, ForStatement forStatement) {
     if (!forStatement.iterator) return;
 }
 
+// block cases (x => { ... }) are not allowed for assignment, must be: x => <expr>
+static void emitLetMatchAssignment(Transpiler *t, LetDeclaration let, MatchExpr match) {
+    emitTypeExpression(t, let.type);
+    emit(t, let.name);
+    emitSemicolon(t);
+    emitNewline(t);
+
+    emit(t, "switch");
+    emitSpace(t);
+
+    emitLeftParen(t);
+    emitExpr(t, match.expression);
+    emitRightParen(t);
+    emitSpace(t);
+
+    emitLeftBrace(t);
+    emitNewline(t);
+
+    for (int i = 0; i < match.caseCount; i++) {
+        emit(t, "case");
+        emitSpace(t);
+        emitExpr(t, match.cases[i].pattern);
+
+        emit(t, ":");
+        emitNewline(t);
+
+        emit(t, let.name);
+        emit(t, "=");
+        emitExpr(t, match.cases[i].expression);
+        emitSemicolon(t);
+
+        emitNewline(t);
+        emit(t, "break");
+        emitSemicolon(t);
+
+        emitNewline(t);
+    }
+
+    emitRightBrace(t);
+    emitNewline(t);
+}
 
 static void emitLetDeclaration(Transpiler *t, LetDeclaration let) {
+    if (let.value->type == AST_MATCH) {
+        emitLetMatchAssignment(t, let, let.value->asMatch);
+        return;
+    }
+
     emitTypeExpression(t, let.type);
     emit(t, let.name);
 
@@ -340,14 +439,39 @@ static void emitMatchExpression(Transpiler *t, MatchExpr match) {
     emitNewline(t);
 
     for (int i = 0; i < match.caseCount; i++) {
-        emit(t, "case ");
+        if (match.cases[i].isElseCase) {
+            emit(t, "default");
+            emit(t, ":");
+            emitNewline(t); 
+
+            if (match.cases[i].expression->type == AST_BLOCK) {
+                for (int j = 0; j < match.cases[i].expression->asBlock.count; j++) {
+                    emitExpr(t, match.cases[i].expression->asBlock.body[j]);
+                }
+            } else {
+                emitExpr(t, match.cases[i].expression);
+            }
+
+            emit(t, "break");
+            emitSemicolon(t);
+
+            emitNewline(t);
+            continue;
+        }
+
+        emit(t, "case");
+        emitSpace(t);
         emitExpr(t, match.cases[i].pattern);
 
         emit(t, ":");
         emitNewline(t);
 
-        for (int j = 0; j < match.cases[i].block.count; j++) {
-            emitExpr(t, match.cases[i].block.body[j]);
+        if (match.cases[i].expression->type == AST_BLOCK) {
+            for (int j = 0; j < match.cases[i].expression->asBlock.count; j++) {
+                emitExpr(t, match.cases[i].expression->asBlock.body[j]);
+            }
+        } else {
+            emitExpr(t, match.cases[i].expression);
         }
 
         emit(t, "break");

@@ -10,7 +10,7 @@
 static AstExpr *parseStatement(Parser *p);
 static AstExpr *parseExpr(Parser *p);
 static AstExpr *parseCallExpression(Parser *p);
-
+static AstExpr *parseMatch(Parser *p);
 
 static AstExpr *error(Parser *p, char *err) {
     compileErrFromParse(p, err);
@@ -300,6 +300,31 @@ static void printExpr(AstExpr expr, int indent) {
             printIndent(indent + 2);
             printf("expression:\n");
             printExpr(*expr.asMatch.expression, indent + 2);
+            
+            printIndent(indent + 2);
+            printf("cases (%d):\n", expr.asMatch.caseCount);
+            for (int i = 0; i < expr.asMatch.caseCount; i++) {
+                if (expr.asMatch.cases[i].isElseCase) {
+                    continue;
+                }
+
+                if (expr.asMatch.cases[i].expression->type == AST_BLOCK) {
+                    for (int j = 0; j < expr.asMatch.cases[j].expression->asBlock.count; j++) {
+                        printExpr(*expr.asMatch.cases[j].expression->asBlock.body[j], indent + 2);
+                    }
+                } else {
+                    printIndent(indent + 4);
+                    printf("case pattern:\n");
+                    
+                    printExpr(*expr.asMatch.cases[i].pattern, indent + 6);
+
+                    printIndent(indent + 4);
+                    printf("case value:\n");
+                    
+                    printExpr(*expr.asMatch.cases[i].expression, indent + 6);
+                    printf("\n");
+                }
+            }
 
             break;   
         }
@@ -535,7 +560,7 @@ static AstExpr *parsePrimary(Parser *p) {
             return newBoolExpr(token.lexeme[0] == 't');
         }
         case TOKEN_FALSE: {
-            return newBoolExpr(token.lexeme[0] == 'f');
+            return newBoolExpr(token.lexeme[0] == 't');
         }
         default: {
             compileErrFromParse(p, "expected expression");
@@ -815,9 +840,14 @@ static AstExpr *parseLet(Parser *p) {
         return error(p, "expected '='");
     }
 
-    AstExpr *value = parseExpr(p);
-    if (isErr(value)) {
-        return error(p, "expected expression");
+    AstExpr *value = NULL;
+    if (match(p, TOKEN_MATCH)) {
+        value = parseMatch(p);
+    } else {
+        value = parseExpr(p);
+        if (isErr(value)) {
+            return error(p, "expected expression");
+        }
     }
 
     return newLetDeclaration(name.lexeme, typeExpr, value);
@@ -967,8 +997,13 @@ static AstExpr *parseFunction(Parser *p) {
 static AstExpr *parseReturn(Parser *p) {
     advance(p);
 
-    AstExpr *value = parseExpr(p);
-    if (isErr(value)) return value;
+    AstExpr *value = NULL;
+    if (match(p, TOKEN_MATCH)) {
+        value = parseMatch(p);
+    } else {
+        value = parseExpr(p);
+        if (isErr(value)) return value;
+    }
 
     return newReturnStatement(value);
 }
@@ -1289,25 +1324,42 @@ static AstExpr *parseMatch(Parser *p) {
         do {
             advance(p);
 
-            AstExpr *pattern = parseExpr(p);
-            if (isErr(pattern)) return pattern;
+            bool isElseCase = false;
+            
+            AstExpr *pattern = NULL;
+            if (!match(p, TOKEN_ELSE)) {
+                pattern = parseExpr(p);
+                if (isErr(pattern)) return pattern;
+            } else {
+                advance(p);
+                isElseCase = true;
+            }
 
             if (!expect(p, TOKEN_LAMBDA)) {
                 return error(p, "expected '=>'");
             }
 
-            if (!expect(p, TOKEN_LEFT_BRACE)) {
-                return error(p, "expected '{'");
+            AstExpr *caseExpressionExpr = NULL;
+
+            if (match(p, TOKEN_LEFT_BRACE)) {
+                advance(p);
+
+                AstExpr *block = parseBlock(p);
+                if (isErr(block)) return block;
+
+                caseExpressionExpr = block;
+
+                if (!expect(p, TOKEN_RIGHT_BRACE)) {
+                    return error(p, "expected '}'");
+                }
+            } else {
+                AstExpr *expr = parseExpr(p);
+                if (isErr(expr)) return expr;
+
+                caseExpressionExpr = expr;
             }
 
-            AstExpr *block = parseBlock(p);
-            if (isErr(block)) return block;
-
-            if (!expect(p, TOKEN_RIGHT_BRACE)) {
-                return error(p, "expected '}'");
-            }
-
-            AstExpr *caseExpr = newMatchCaseExpr(pattern, block->asBlock);
+            AstExpr *caseExpr = newMatchCaseExpr(pattern, caseExpressionExpr, isElseCase);
             if (caseExpr->type != AST_MATCH_CASE) return caseExpr;
 
             if (caseCount >= caseCapacity) {
@@ -1320,7 +1372,7 @@ static AstExpr *parseMatch(Parser *p) {
     }
     
     if (!expect(p, TOKEN_RIGHT_BRACE)) {
-        return error(p, "expected '}'");
+        return error(p, "expected '}' or ',' on match case");
     }
 
     return newMatchExpr(expression, cases, caseCount, caseCapacity);

@@ -247,11 +247,12 @@ AstExpr *newMatchExpr(AstExpr *expression, MatchCaseExpr *cases, int caseCount, 
     return expr;
 }
 
-AstExpr *newMatchCaseExpr(AstExpr *pattern, BlockExpr block) {
+AstExpr *newMatchCaseExpr(AstExpr *pattern, AstExpr *expression, bool isElseCase) {
     AstExpr *expr = newExpr(AST_MATCH_CASE);
 
     expr->asMatchCase.pattern = pattern;
-    expr->asMatchCase.block = block;
+    expr->asMatchCase.expression = expression;
+    expr->asMatchCase.isElseCase = isElseCase;
 
     return expr;
 }

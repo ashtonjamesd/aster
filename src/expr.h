@@ -208,7 +208,12 @@ typedef struct {
 
 typedef struct {
     AstExpr  *pattern;
-    BlockExpr block;
+
+    // could be a block expression or something integral
+    AstExpr *expression;
+
+    // pattern will be null if this is true
+    bool isElseCase;
 } MatchCaseExpr;
 
 typedef struct {
@@ -225,6 +230,10 @@ typedef struct {
     int            caseCount;
     int            caseCapacity;
     MatchCaseExpr *cases;
+
+    // represents a single case
+    // may be null
+    MatchCaseExpr *elseCase;
 } MatchExpr;
 
 struct AstExpr {
@@ -288,7 +297,7 @@ AstExpr *newTernaryExpr(AstExpr *condition, AstExpr *falseExpr, AstExpr *trueExp
 AstExpr *newForStatement(char *variable, AstExpr *iterator, BlockExpr block);
 AstExpr *newIfStatement(AstExpr *condition, BlockExpr block);
 AstExpr *newMatchExpr(AstExpr *expression, MatchCaseExpr *cases, int caseCount, int caseCapacity);
-AstExpr *newMatchCaseExpr(AstExpr *pattern, BlockExpr block);
+AstExpr *newMatchCaseExpr(AstExpr *pattern, AstExpr *expression, bool isElseCase);
 AstExpr *newEnumDeclaration(char *name, char **values, int valueCount, int valueCapacity, bool isPublic);
 
 AstExpr *newErrExpr();

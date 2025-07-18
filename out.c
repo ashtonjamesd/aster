@@ -1,10 +1,14 @@
 #include <stdbool.h>
 #include <stdio.h>
-enum Test {
-item1,
-item2,
-item3,
-item4,
-};
+
 void main() {
+}
+
+_Bool isEven(signed int n) {
+switch (min(1, 2)) {
+case 0:
+return true;
+break;
+default:
+return false;}
 }

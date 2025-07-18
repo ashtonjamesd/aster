@@ -40,8 +40,19 @@ pub struct math {
         return if a > b then b else a
     }
 
-    pub fn isEven(n: i8): bool => n mod 2 == 0
-    pub fn isOdd(n: i8): bool => n mod 2 != 0
+    fn isEven(n: i32): bool {
+        return match n mod 2 {
+            0 => true,
+            else => false
+        }
+    }
+
+    fn isOdd(n: i32): bool {
+        return match n mod 2 {
+            0 => false,
+            else => true
+        }
+    }
 
     pub fn factorial(n: i32): i32 {
         return if n <= 1 then 1 else n * factorial(n - 1)

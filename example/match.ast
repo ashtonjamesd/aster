@@ -1,0 +1,35 @@
+pub fn main(): u0 {
+    return boolToInt(true)
+}
+
+fn test(): i8 {
+    match 1 {
+        1 => {
+            match 2 + 2 {
+                4 => {
+                    return 1
+                },
+                else => {
+                    return 0
+                }
+            }
+        },
+        else => {
+            return 0
+        }
+    }
+}
+
+fn isEven(n: i32): bool {
+    return match n {
+        n mod 2 == 0 => true
+        n mod 2 != 0 => false
+    }
+}
+
+fn boolToInt(b: bool): i8 {
+    return match b {
+        true  => 1,
+        false => 0
+    }
+}
