@@ -11,6 +11,7 @@ static AstExpr *parseStatement(Parser *p);
 static AstExpr *parseExpr(Parser *p);
 static AstExpr *parseCallExpression(Parser *p);
 static AstExpr *parseMatch(Parser *p);
+static AstExpr *parseStructField(Parser *p);
 
 static AstExpr *error(Parser *p, char *err) {
     compileErrFromParse(p, err);
@@ -78,11 +79,24 @@ static void freeExpr(AstExpr *expr) {
             freeExpr(expr->asTernary.falseExpr);
             break;
         }
+        case AST_STRUCT_FIELD: {
+            free(expr->asStructField.type.name);
+            free(expr->asStructField.name);
+            break;
+        }
         case AST_CALL_EXPR: {
             for (int i = 0; i < expr->asCallExpr.argCount; i++) {
                 freeExpr(expr->asCallExpr.arguments[i]);
             }
             free(expr->asCallExpr.name);
+            break;
+        }
+        case AST_STRUCT_INITIALIZER: {
+            for (int i = 0; i < expr->asStructInit.fieldCount; i++) {
+                free(expr->asStructInit.fields[i].name);
+                freeExpr(expr->asStructInit.fields[i].value);
+            }
+            free(expr->asStructInit.fields);
             break;
         }
         case AST_IDENTIFIER: {
@@ -100,6 +114,11 @@ static void freeExpr(AstExpr *expr) {
         case AST_LET: {
             free(expr->asLet.name);
             freeExpr(expr->asLet.value);
+            break;
+        }
+        case AST_PROPERTY_ACCESS: {
+            free(expr->asProperty.property);
+            freeExpr(expr->asProperty.object);
             break;
         }
         case AST_TYPE_EXPR: {
@@ -289,6 +308,19 @@ static void printExpr(AstExpr expr, int indent) {
             }
             break;
         }
+        case AST_STRUCT_FIELD: {
+            printf("struct field:\n");
+            
+            printIndent(indent + 2);
+            printf("name: %s\n", expr.asStructField.name);
+            
+            printIndent(indent + 2);
+            printf("type: %s\n", expr.asStructField.type.name);
+        
+            printIndent(indent + 2);
+            printf("isPublic: %s\n", expr.asStructField.isPublic ? "true" : "false");
+            break;
+        }
         case AST_LET: {
             printf("let declaration:\n");
             
@@ -296,7 +328,7 @@ static void printExpr(AstExpr expr, int indent) {
             printf("name: %s\n", expr.asLet.name);
             
             printIndent(indent + 2);
-            printf("type: %s\n", expr.asLet.type.name );
+            printf("type: %s\n", expr.asLet.type.name);
 
             printIndent(indent + 2);
             printf("ptr depth: %d\n", expr.asLet.type.ptrDepth);
@@ -304,6 +336,17 @@ static void printExpr(AstExpr expr, int indent) {
             printIndent(indent + 2);
             printf("value:\n");
             printExpr(*expr.asLet.value, indent + 4);
+            break;
+        }
+        case AST_PROPERTY_ACCESS: {
+            printf("property access:\n");
+
+            printIndent(indent + 2);
+            printf("object:\n");
+            printExpr(*expr.asProperty.object, indent + 4);
+
+            printIndent(indent + 2);
+            printf("property: %s\n", expr.asProperty.property);
             break;
         }
         case AST_MATCH: {
@@ -339,6 +382,20 @@ static void printExpr(AstExpr expr, int indent) {
             }
 
             break;   
+        }
+        case AST_STRUCT_INITIALIZER: {
+            printf("struct initializer:\n");
+
+            for (int i = 0; i < expr.asStructInit.fieldCount; i++) {
+                printIndent(indent + 2);
+                printf("name: %s\n", expr.asStructInit.fields[i].name);
+
+                printIndent(indent + 2);
+                printf("value:\n");
+                printExpr(*expr.asStructInit.fields[i].value, indent + 4);
+            }
+
+            break;
         }
         case AST_ASSIGN_EXPR: {
             printf("assignment expression:\n");
@@ -542,6 +599,50 @@ static inline bool isEnd(Parser *p) {
     return false;
 }
 
+static AstExpr *parseStructFieldInit(Parser *p) {
+    int fieldCount = 0;
+    int fieldCapacity = 1;
+    StructFieldInit *fields = malloc(sizeof(StructFieldInit));
+
+    if (!match(p, TOKEN_RIGHT_BRACE)) {
+        recede(p);
+        do {
+            advance(p);
+
+            if (match(p, TOKEN_RIGHT_BRACE)) {
+                break;
+            }
+
+            Token name = currentToken(p);
+            if (!expect(p, TOKEN_IDENTIFIER)) {
+                return error(p, "expected identifier");
+            }
+
+            if (!expect(p, TOKEN_COLON)) {
+                return error(p, "expected ':'");
+            }
+
+            AstExpr *value = parseExpr(p);
+            
+            if (fieldCount >= fieldCapacity) {
+                fieldCapacity *= 2;
+                fields = realloc(fields, sizeof(StructField) * fieldCapacity);
+            }
+
+            
+            fields[fieldCount++] = newStructFieldInit(name.lexeme, value)->asStructFieldInit;
+
+        } while (match(p, TOKEN_COMMA));  // !match TOKEN_RIGHT_BRACE
+    }
+
+    if (!expect(p, TOKEN_RIGHT_BRACE)) {
+        return error(p, "expected '}'");
+    }
+
+    return newStructInitializer(fields, fieldCount, fieldCapacity);
+}
+
+
 static AstExpr *parsePrimary(Parser *p) {
     Token token = currentToken(p);
     advance(p);
@@ -582,11 +683,37 @@ static AstExpr *parsePrimary(Parser *p) {
         case TOKEN_FALSE: {
             return newBoolExpr(token.lexeme[0] == 't');
         }
+        case TOKEN_LEFT_BRACE: {
+            return parseStructFieldInit(p);
+        }
         default: {
             compileErrFromParse(p, "expected expression");
             return newErrExpr();
         }
     }
+}
+
+static AstExpr *parsePostfix(Parser *p) {
+    AstExpr *expr = parsePrimary(p);
+
+    while (true) {
+        if (match(p, TOKEN_DOT)) {
+            advance(p);
+
+            if (!match(p, TOKEN_IDENTIFIER)) {
+                return error(p, "expected identifier after '.'");
+            }
+
+            char *property = currentToken(p).lexeme;
+            advance(p);
+
+            expr = newPropertyAccessExpr(expr, property);
+        } else {
+            break;
+        }
+    }
+
+    return expr;
 }
 
 static AstExpr *parsePointerOp(Parser *p) {
@@ -600,7 +727,7 @@ static AstExpr *parsePointerOp(Parser *p) {
         return newUnaryExpr(right, mapToOperatorType(operator));
     }
 
-    return parsePrimary(p);
+    return parsePostfix(p);
 }
 
 static AstExpr *parseUnary(Parser *p) {
@@ -1192,6 +1319,33 @@ static AstExpr *parseCallExpression(Parser *p) {
     return newCallExpr(name.lexeme, count, capacity, arguments);
 }
 
+static AstExpr *parseStructField(Parser *p) {
+    bool isPublic = false;
+
+    if (match(p, TOKEN_PUB)) {
+        advance(p);
+        isPublic = true;
+    }
+
+    Token name = currentToken(p);
+    if (!expect(p, TOKEN_IDENTIFIER)) {
+        return error(p, "expected identifier");
+    }
+
+    if (!expect(p, TOKEN_COLON)) {
+        return error(p, "expected ':'");
+    }
+
+    AstExpr *type = parseType(p);
+    if (isErr(type)) return type;
+
+    if (match(p, TOKEN_COMMA)) {
+        advance(p);
+    }
+
+    return newStructField(name.lexeme, type, isPublic);
+}
+
 static AstExpr *parseIdentifier(Parser *p) {
     advance(p);
 
@@ -1203,6 +1357,10 @@ static AstExpr *parseIdentifier(Parser *p) {
         recede(p);
 
         return parseCallExpression(p);
+    } else if (match(p, TOKEN_COLON)) {
+        recede(p);
+
+        return parseStructField(p);
     }
     
     return parseExpr(p);
@@ -1272,6 +1430,10 @@ static AstExpr *parsePub(Parser *p) {
         recede(p);
 
         return parseEnum(p);
+    } else if (match(p, TOKEN_IDENTIFIER)) {
+        recede(p);
+
+        return parseStructField(p);
     }
 
     return parseExpr(p);

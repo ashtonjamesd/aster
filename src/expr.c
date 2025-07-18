@@ -146,11 +146,12 @@ AstExpr *newStructDeclaration(char *name, AstExpr **members, int memberCount, in
     return expr;
 }
 
-AstExpr *newStructField(char *name, AstExpr *type) {
+AstExpr *newStructField(char *name, AstExpr *type, bool isPublic) {
     AstExpr *expr = newExpr(AST_STRUCT_FIELD);
 
     expr->asStructField.name = strdup(name);
     expr->asStructField.type = type->asType;
+    expr->asStructField.isPublic = isPublic;
 
     return expr;
 }
@@ -270,14 +271,40 @@ AstExpr *newEnumDeclaration(char *name, char **values, int valueCount, int value
 }
 
 AstExpr *newGroupingExpr(AstExpr *expression) {
-    AstExpr *expr = malloc(sizeof(AstExpr));
+    AstExpr *expr = newExpr(AST_GROUPING);
 
-    expr->type = AST_GROUPING;
     expr->asGrouping.expression = expression;
     
     return expr;
 }
 
+AstExpr *newPropertyAccessExpr(AstExpr *object, char *property) {
+    AstExpr *expr = newExpr(AST_PROPERTY_ACCESS);
+
+    expr->asProperty.object = object;
+    expr->asProperty.property = strdup(property);
+
+    return expr;
+}
+
+AstExpr *newStructInitializer(StructFieldInit *fields, int fieldCount, int fieldCapacity) {
+    AstExpr *expr = newExpr(AST_STRUCT_INITIALIZER);
+
+    expr->asStructInit.fields = fields;
+    expr->asStructInit.fieldCount = fieldCount;
+    expr->asStructInit.fieldCapacity = fieldCapacity;
+
+    return expr;
+}
+
+AstExpr *newStructFieldInit(char *name, AstExpr *value) {
+    AstExpr *expr = newExpr(AST_STRUCT_FIELD_INIT);
+
+    expr->asStructFieldInit.name = strdup(name);
+    expr->asStructFieldInit.value = value;
+
+    return expr;
+}
 
 AstExpr *newErrExpr() {
     AstExpr *expr = newExpr(AST_ERR_EXPR);

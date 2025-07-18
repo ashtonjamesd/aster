@@ -33,6 +33,9 @@ typedef enum {
     AST_ENUM,
     AST_GROUPING,
     AST_ERR_EXPR,
+    AST_PROPERTY_ACCESS,
+    AST_STRUCT_INITIALIZER,
+    AST_STRUCT_FIELD_INIT,
 } AstType;
 
 typedef enum {
@@ -164,7 +167,14 @@ typedef struct {
 typedef struct {
     char    *name;
     TypeExpr type;
+    bool     isPublic;
 } StructField;
+// change to StructFieldDeclaration
+
+typedef struct {
+    char    *name;
+    AstExpr *value;
+} StructFieldInit;
 
 typedef struct {
     char     *name;
@@ -212,6 +222,11 @@ typedef struct {
 } TernaryExpression;
 
 typedef struct {
+    AstExpr *object;
+    char *property;
+} PropertyAccessExpr;
+
+typedef struct {
     AstExpr  *pattern;
 
     // could be a block expression or something integral
@@ -240,6 +255,12 @@ typedef struct {
     // may be null
     MatchCaseExpr *elseCase;
 } MatchExpr;
+
+typedef struct {
+    int              fieldCount;
+    int              fieldCapacity;
+    StructFieldInit *fields;
+} StructInitializer;
 
 struct AstExpr {
     AstType type;
@@ -274,6 +295,9 @@ struct AstExpr {
         MatchCaseExpr       asMatchCase;
         EnumDeclaration     asEnum;
         GroupingExpression  asGrouping;
+        PropertyAccessExpr  asProperty;
+        StructInitializer   asStructInit;
+        StructFieldInit     asStructFieldInit;
     };
 };
 
@@ -292,7 +316,7 @@ AstExpr *newBlockExpr(AstExpr **body, int count, int capacity);
 AstExpr *newReturnStatement(AstExpr *expr);
 AstExpr *newFunctionParameter(char *name, AstExpr *type);
 AstExpr *newStructDeclaration(char *name, AstExpr **members, int memberCount, int memberCapacity, bool isInterface, bool isPublic);
-AstExpr *newStructField(char *name, AstExpr *type);
+AstExpr *newStructField(char *name, AstExpr *type, bool isPublic);
 AstExpr *newWhileStatement(AstExpr *condition, AstExpr *alteration, AstExpr *block);
 AstExpr *newNextStatement();
 AstExpr *newStopStatement();
@@ -306,6 +330,10 @@ AstExpr *newMatchExpr(AstExpr *expression, MatchCaseExpr *cases, int caseCount, 
 AstExpr *newMatchCaseExpr(AstExpr *pattern, AstExpr *expression, bool isElseCase);
 AstExpr *newEnumDeclaration(char *name, char **values, int valueCount, int valueCapacity, bool isPublic);
 AstExpr *newGroupingExpr(AstExpr *expression);
+AstExpr *newPropertyAccessExpr(AstExpr *object, char *property);
+AstExpr *newStructInitializer(StructFieldInit *fields, int fieldCount, int fieldCapacity);
+AstExpr *newStructFieldInit(char *name, AstExpr *value);
+
 AstExpr *newErrExpr();
 
 #endif

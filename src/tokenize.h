@@ -28,6 +28,7 @@ typedef enum {
     TOKEN_AS,
     TOKEN_MATCH,
     TOKEN_ENUM,
+    TOKEN_MODULE,
 
     TOKEN_SINGLE_EQUALS,
     TOKEN_COLON,
@@ -55,6 +56,7 @@ typedef enum {
     TOKEN_CARET,
     TOKEN_SHIFT_LEFT,
     TOKEN_SHIFT_RIGHT,
+    TOKEN_DOT,
 
     TOKEN_INTEGER,
     TOKEN_FLOAT,

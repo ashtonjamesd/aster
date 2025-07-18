@@ -1,55 +1,65 @@
-pub fn main(): i8 { }
+pub fn main(): i8 { 
+    let colour: Colour = new(0, 0, 0, 0)
+}
 
-pub struct ascii {
-    pub fn isAlphanumeric(c: i8): bool {
-        return isDigit(c) or isLetter(c)
-    }
+pub struct Colour {
+    r: u8
+    g: u8
+    b: u8
+    a: u8
 
-    pub fn isPunctuation(c: i8): bool {
-        return not isAlphanumeric(c) and not isWhitespace(c)
-    }
-
-    pub fn isAscii(c: i8): bool => c >= 0 and c <= 127
-    
-    pub fn toLower(c: i8): i8 => if isUpper(c) then c + 32 else c
-    pub fn toUpper(c: i8): i8 => if isLower(c) then c - 32 else c
-
-    pub fn isLetter(c: i8): bool => isLower(c) or isUpper(c)
-
-    pub fn isLower(c: i8): bool => c >= 'a' and c <= 'z'
-    pub fn isUpper(c: i8): bool => c >= 'A' and c <= 'Z'
-    pub fn isDigit(c: i8): bool => c >= '0' and c <= '9'
-
-    pub fn isPrintable(c: i8): bool => c >= 32 and c <= 126
-    pub fn isControl(c: i8): bool => (c >= 0 and c < 32) or c == 127
-    
-    pub fn isVowel(c: i8): bool {
-        return match c {
-            'a' =>  true,
-            'e' =>  true,
-            'i' =>  true,
-            'o' =>  true,
-            'u' =>  true,
-            else => false
+    pub fn new(r: u8, g: u8, b: u8, a: u8): Colour {
+        let colour: Colour = {
+            r: r,
+            g: g,
+            b: b,
+            a: a
         }
+
+        return colour
     }
 
-    pub fn isConsonant(c: i8): bool {
-        return isLetter(c) and not isVowel(c)
+    pub fn default(): Colour {
+        let colour: Colour = {
+            r: 0,
+            g: 0,
+            b: 0,
+            a: 0
+        }
+
+        return colour
     }
 
-    pub fn isHex(c: i8): bool {
-        return isDigit(c) or (c >= 'a' and c <= 'f') or (c >= 'A' and c <= 'F')
+    pub fn red(): Colour {
+        let colour: Colour = {
+            r: 255,
+            g: 0,
+            b: 0,
+            a: 255
+        }
+
+        return colour
     }
 
-    pub fn isBin(c: i8): bool => c == '1' or c == '0'
+    pub fn green(): Colour {
+        let colour: Colour = {
+            r: 0,
+            g: 255,
+            b: 0,
+            a: 255
+        }
 
-    pub fn isWhitespace(c: i8): bool {
-        return c == ' '
-            or c == '\t'
-            or c == '\r'
-            or c == '\n'
-            or c == '\v'
-            or c == '\f'
+        return colour
+    }
+
+    pub fn blue(): Colour {
+        let colour: Colour = {
+            r: 0,
+            g: 0,
+            b: 255,
+            a: 255
+        }
+
+        return colour
     }
 }

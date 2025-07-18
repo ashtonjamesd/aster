@@ -247,6 +247,7 @@ static Token tokenizeSymbol(Lexer *l) {
         case '-': return newToken("-", TOKEN_MINUS, l);
         case '/': return newToken("/", TOKEN_SLASH, l);
         case '%': return newToken("%", TOKEN_MODULO, l);
+        case '.': return newToken(".", TOKEN_DOT, l);
         case '>': {
             if (currentChar(l) == '=') {
                 advance(l);

@@ -1,0 +1,35 @@
+pub fn main(): i8 { 
+    let z: Point = new(5, 7)
+
+}
+
+pub struct Point {
+    pub x: i32
+    pub y: i32
+
+    pub fn new(x: i32, y: i32): Point {
+        let p: Point = {
+            x: x, y: y
+        }
+
+        return p
+    }
+
+    pub fn from(point: Point): Point {
+        let newPoint: Point = {
+            x: point.x,
+            y: point.y
+        }
+
+        return newPoint
+    }
+
+    pub fn zero(): Point {
+        let p: Point = {
+            x: 0,
+            y: 0
+        }
+
+        return p
+    }
+}

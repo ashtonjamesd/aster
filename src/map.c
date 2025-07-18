@@ -28,10 +28,7 @@ char *mapPrimitiveTypeToC(char *type) {
 
     else if (strEq(type, "size")) return "size_t";
 
-    exitWithInternalCompilerError("unable to map aster type to c type");
-    
-    // prevents compiler warning (-Wreturn-type)
-    exit(1);
+    return type;
 }
 
 OperatorType mapToOperatorType(TokenType type) {

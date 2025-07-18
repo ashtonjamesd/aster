@@ -256,9 +256,9 @@ static void emitLetDeclaration(Transpiler *t, LetDeclaration let) {
 }
 
 static void emitStructDeclaration(Transpiler *t, StructDeclaration structDeclaration) {
-    emit(t, "struct");
+    emit(t, "typedef");
     emitSpace(t);
-    emit(t, structDeclaration.name);
+    emit(t, "struct");
     emitSpace(t);
 
     emitLeftBrace(t);
@@ -295,6 +295,8 @@ static void emitStructDeclaration(Transpiler *t, StructDeclaration structDeclara
 
     emitNewline(t);
     emitRightBrace(t);
+    emitSpace(t);
+    emit(t, structDeclaration.name);
     emitSemicolon(t);
 
     for (int i = 0; i < fnIndexCount; i++) {
@@ -510,6 +512,38 @@ static void emitGrouping(Transpiler *t, GroupingExpression groupExpression) {
     emitRightParen(t);
 }
 
+static void emitPropertyAccess(Transpiler *t, PropertyAccessExpr property) {
+    emitExpr(t, property.object);
+    emit(t, ".");
+    emit(t, property.property);
+}
+
+static void emitStructField(Transpiler *t, StructField field) {
+    emitTypeExpression(t, field.type);
+    emit(t, field.name);
+
+    emitSemicolon(t);
+}
+
+static void emitStructInit(Transpiler *t, StructInitializer structInit) {
+    emitLeftBrace(t);
+    emitNewline(t);
+
+    for (int i = 0; i < structInit.fieldCount; i++) {
+        emit(t, ".");
+        emit(t, structInit.fields[i].name);
+        
+        emitSpace(t);
+        emit(t, "=");
+        emitSpace(t);
+        emitExpr(t, structInit.fields[i].value);
+        emitComma(t);
+        emitNewline(t);
+    }
+
+    emitRightBrace(t);
+}
+
 static void emitExpr(Transpiler *t, AstExpr *expr) {
     switch (expr->type) {
         case AST_FUNCTION_DECLARATION: {
@@ -542,6 +576,10 @@ static void emitExpr(Transpiler *t, AstExpr *expr) {
         }
         case AST_FOR: {
             emitForStatement(t, expr->asFor);
+            break;
+        }
+        case AST_STRUCT_FIELD: {
+            emitStructField(t, expr->asStructField);
             break;
         }
         case AST_ASSIGN_EXPR: {
@@ -602,6 +640,14 @@ static void emitExpr(Transpiler *t, AstExpr *expr) {
         }
         case AST_GROUPING: {
             emitGrouping(t, expr->asGrouping);
+            break;
+        }
+        case AST_PROPERTY_ACCESS: {
+            emitPropertyAccess(t, expr->asProperty);
+            break;
+        }
+        case AST_STRUCT_INITIALIZER: {
+            emitStructInit(t, expr->asStructInit);
             break;
         }
         default: {

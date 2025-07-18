@@ -209,6 +209,12 @@ static void analyzeExpr(Analyzer *analyzer, AstExpr *expr) {
         case AST_ENUM: {
             break;
         }
+        case AST_PROPERTY_ACCESS: {
+            break;
+        }
+        case AST_STRUCT_INITIALIZER: {
+            break;
+        }
         case AST_FUNCTION_DECLARATION: {
             analyzeFunctionDeclaration(analyzer, expr->asFunction);
             break;
