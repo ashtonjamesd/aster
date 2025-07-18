@@ -269,6 +269,16 @@ AstExpr *newEnumDeclaration(char *name, char **values, int valueCount, int value
     return expr;
 }
 
+AstExpr *newGroupingExpr(AstExpr *expression) {
+    AstExpr *expr = malloc(sizeof(AstExpr));
+
+    expr->type = AST_GROUPING;
+    expr->asGrouping.expression = expression;
+    
+    return expr;
+}
+
+
 AstExpr *newErrExpr() {
     AstExpr *expr = newExpr(AST_ERR_EXPR);
 

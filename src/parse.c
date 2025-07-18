@@ -60,6 +60,10 @@ static void freeExpr(AstExpr *expr) {
         case AST_BOOL_LITERAL: {
             break;
         }
+        case AST_GROUPING: {
+            freeExpr(expr->asGrouping.expression);
+            break;
+        }
         case AST_ENUM: {
             for (int i = 0; i < expr->asEnum.valueCount; i++) {
                 free(expr->asEnum.values[i]);
@@ -232,6 +236,14 @@ static void printExpr(AstExpr expr, int indent) {
         }
         case AST_STOP: {
             printf("stop statement\n");
+            break;
+        }
+        case AST_GROUPING: {
+            printf("group expression\n");
+
+            printIndent(indent + 2);
+            printf("right: \n");
+            printExpr(*expr.asGrouping.expression, indent + 4);
             break;
         }
         case AST_UNARY: {
@@ -535,6 +547,14 @@ static AstExpr *parsePrimary(Parser *p) {
     advance(p);
 
     switch (token.type) {
+        case TOKEN_LEFT_PAREN: {
+            AstExpr *expr = parseExpr(p);
+            if (!expect(p, TOKEN_RIGHT_PAREN)) {
+                return error(p, "expected ')' after expression");
+            }
+
+            return newGroupingExpr(expr);
+        }
         case TOKEN_INTEGER: {
             return newIntegerExpr(atol(token.lexeme));
         }

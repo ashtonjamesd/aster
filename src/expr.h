@@ -31,6 +31,7 @@ typedef enum {
     AST_MATCH,
     AST_MATCH_CASE,
     AST_ENUM,
+    AST_GROUPING,
     AST_ERR_EXPR,
 } AstType;
 
@@ -64,6 +65,10 @@ typedef enum {
     OP_BITWISE_SHIFT_RIGHT,
     OP_BITWISE_XOR,
 } OperatorType;
+
+typedef struct {
+    AstExpr *expression;
+} GroupingExpression;
 
 typedef struct {
     long value;
@@ -268,6 +273,7 @@ struct AstExpr {
         MatchExpr           asMatch;
         MatchCaseExpr       asMatchCase;
         EnumDeclaration     asEnum;
+        GroupingExpression  asGrouping;
     };
 };
 
@@ -299,7 +305,7 @@ AstExpr *newIfStatement(AstExpr *condition, BlockExpr block);
 AstExpr *newMatchExpr(AstExpr *expression, MatchCaseExpr *cases, int caseCount, int caseCapacity);
 AstExpr *newMatchCaseExpr(AstExpr *pattern, AstExpr *expression, bool isElseCase);
 AstExpr *newEnumDeclaration(char *name, char **values, int valueCount, int valueCapacity, bool isPublic);
-
+AstExpr *newGroupingExpr(AstExpr *expression);
 AstExpr *newErrExpr();
 
 #endif

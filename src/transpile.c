@@ -504,6 +504,12 @@ static void emitEnumDeclaration(Transpiler *t, EnumDeclaration enumDeclaration) 
     emitSemicolon(t);
 }
 
+static void emitGrouping(Transpiler *t, GroupingExpression groupExpression) {
+    emitLeftParen(t);
+    emitExpr(t, groupExpression.expression);
+    emitRightParen(t);
+}
+
 static void emitExpr(Transpiler *t, AstExpr *expr) {
     switch (expr->type) {
         case AST_FUNCTION_DECLARATION: {
@@ -594,8 +600,52 @@ static void emitExpr(Transpiler *t, AstExpr *expr) {
             emitTernary(t, expr->asTernary);
             break;
         }
+        case AST_GROUPING: {
+            emitGrouping(t, expr->asGrouping);
+            break;
+        }
         default: {
             exitWithInternalCompilerError("unknown expression type in 'emitExpr'");
+        }
+    }
+}
+
+static void emitFunctionForwardDeclaration(Transpiler *t, FunctionDeclaration function) {
+    emitNewline(t);
+
+    emitTypeExpression(t, function.returnType);
+    emit(t, function.name);
+
+    emitLeftParen(t);
+
+    for (int i = 0; i < function.paramCount; i++) {
+        emitTypeExpression(t, function.parameters[i].type);
+        emit(t, function.parameters[i].name);
+
+        if (i != function.paramCount - 1) {
+            emitComma(t);
+            emitSpace(t);
+        }
+    }
+
+    emitRightParen(t);
+    emitSemicolon(t);
+}
+
+void emitForwardDeclarations(Transpiler *t) {
+    for (int i = 0; i < t->ast.exprCount; i++) {
+        if (t->ast.exprs[i]->type == AST_FUNCTION_DECLARATION) {
+            emitFunctionForwardDeclaration(t, t->ast.exprs[i]->asFunction);
+        }
+
+        if (t->ast.exprs[i]->type == AST_STRUCT_DECLARATION) {
+            StructDeclaration structDeclaration = t->ast.exprs[i]->asStruct;
+
+            for (int j = 0; j < structDeclaration.memberCount; j++) {
+                if (structDeclaration.members[j]->type == AST_FUNCTION_DECLARATION) {
+                    emitFunctionForwardDeclaration(t, structDeclaration.members[j]->asFunction);
+                }
+            }
         }
     }
 }
@@ -603,6 +653,11 @@ static void emitExpr(Transpiler *t, AstExpr *expr) {
 void transpile(Transpiler *t) {
     fprintf(t->fptr, "#include <stdbool.h>\n");
     fprintf(t->fptr, "#include <stdio.h>\n");
+
+    emitForwardDeclarations(t);
+
+    emitNewline(t);
+    emitNewline(t);
 
     for (int i = 0; i < t->ast.exprCount; i++) {
         emitExpr(t, t->ast.exprs[i]);
