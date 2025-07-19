@@ -106,6 +106,7 @@ typedef struct {
     char    *name;
     AstExpr *value;
     TypeExpr type;
+    bool     isConstant;
 } LetDeclaration;
 
 typedef struct {
@@ -308,7 +309,7 @@ AstExpr *newStringExpr(char *name);
 AstExpr *newCharExpr(char *name);
 AstExpr *newBoolExpr(bool value);
 
-AstExpr *newLetDeclaration(char *name, AstExpr *type, AstExpr *value);
+AstExpr *newLetDeclaration(char *name, AstExpr *type, AstExpr *value, bool isConstant);
 AstExpr *newTypeExpr(char *name, uint8_t ptrDepth);
 AstExpr *newAssignExpr(char *name, AstExpr *value, uint8_t ptrDepth);
 AstExpr *newFunctionDeclaration(char *name, TypeExpr returnType, BlockExpr body, int paramCount, int paramCapacity, FunctionParameter *parameters, bool isLambda, AstExpr *lambdaExpr, bool isPublic);

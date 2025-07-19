@@ -642,7 +642,6 @@ static AstExpr *parseStructFieldInit(Parser *p) {
     return newStructInitializer(fields, fieldCount, fieldCapacity);
 }
 
-
 static AstExpr *parsePrimary(Parser *p) {
     Token token = currentToken(p);
     advance(p);
@@ -967,6 +966,11 @@ static AstExpr *parseType(Parser *p) {
 }
 
 static AstExpr *parseLet(Parser *p) {
+    bool isConstant = false;
+    if (match(p, TOKEN_CONST)) {
+        isConstant = true;
+    }
+
     advance(p);
 
     Token name = currentToken(p);
@@ -997,7 +1001,7 @@ static AstExpr *parseLet(Parser *p) {
         }
     }
 
-    return newLetDeclaration(name.lexeme, typeExpr, value);
+    return newLetDeclaration(name.lexeme, typeExpr, value, isConstant);
 }
 
 static AstExpr *parseAssignment(Parser *p) {
@@ -1565,6 +1569,9 @@ static AstExpr *parseStatement(Parser *p) {
 
     switch (token.type) {
         case TOKEN_LET: {
+            return parseLet(p);
+        }
+        case TOKEN_CONST: {
             return parseLet(p);
         }
         case TOKEN_MATCH: {

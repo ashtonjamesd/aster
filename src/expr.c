@@ -61,12 +61,13 @@ AstExpr *newCharExpr(char *chr) {
     return expr;
 }
 
-AstExpr *newLetDeclaration(char *name, AstExpr *type, AstExpr *value) {
+AstExpr *newLetDeclaration(char *name, AstExpr *type, AstExpr *value, bool isConstant) {
     AstExpr *expr = newExpr(AST_LET);
 
     expr->asLet.name = strdup(name);
     expr->asLet.value = value;
     expr->asLet.type = type->asType;
+    expr->asLet.isConstant = isConstant;
 
     return expr;
 }

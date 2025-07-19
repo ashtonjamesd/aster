@@ -5,6 +5,11 @@
 #include "parse.h"
 
 typedef struct {
+    bool isConstant;
+    long value;
+} ConstEvalResult;
+
+typedef struct {
     char    *name;
     AstExpr *declaration;
 } Symbol;

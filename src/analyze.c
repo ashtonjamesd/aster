@@ -56,22 +56,48 @@ Analyzer newAnalyzer(Parser *parser) {
 }
 
 static void raiseNoEntryPointErr(Analyzer *analyzer) {
-    compileErrFromAnalyzer(analyzer, "program requires an entry point 'main' defined\n");
+    compileErrFromAnalyzer(analyzer, 
+        "program requires an entry point 'main' defined\n"
+    );
 }
 
 static void raiseDuplicateSymbol(Analyzer *analyzer, char *name) {
-    compileErrFromAnalyzer(analyzer, "symbol '%s' already defined in this scope\n", name);
+    compileErrFromAnalyzer(analyzer, 
+        "symbol '%s' already defined in this scope\n", name
+    );
 }
 
 static void raiseUndefinedSymbol(Analyzer *analyzer, char *name) {
-    compileErrFromAnalyzer(analyzer, "symbol '%s' does not exist in this scope\n", name);
+    compileErrFromAnalyzer(analyzer, 
+        "symbol '%s' does not exist in this scope\n", name
+    );
 }
 
 static void raiseInvalidLoopContextualKeyword(Analyzer *analyzer, char *keyword) {
-    compileErrFromAnalyzer(analyzer, "keyword '%s' can only be used inside a loop body\n", keyword);
+    compileErrFromAnalyzer(analyzer, 
+        "keyword '%s' can only be used inside a loop body\n", keyword
+    );
 }
 
-static bool declareSymbol(SymbolTable *table, char *name) {
+static void raiseIntOverflow(Analyzer *analyzer, long value, char *name, char *type) {
+    compileErrFromAnalyzer(analyzer, 
+        "constant value %d overflows type %s on symbol %s", value, type, name
+    );
+}
+
+static void raiseIntUnderflow(Analyzer *analyzer, long value, char *name, char *type) {
+    compileErrFromAnalyzer(analyzer, 
+        "constant value %d underflows type %s on symbol %s", value, type, name
+    );
+}
+
+static void raiseConstantCannotBeReassigned(Analyzer *analyzer, char *name) {
+    compileErrFromAnalyzer(analyzer, 
+        "constant symbol '%s' cannot be reassigned", name
+    ); 
+}
+
+static bool declareSymbol(SymbolTable *table, char *name, AstExpr *declaration) {
     if (table->depth == 0) return true;
     
     Scope *current = &table->scopes[table->depth - 1];
@@ -87,20 +113,23 @@ static bool declareSymbol(SymbolTable *table, char *name) {
         current->symbols = realloc(current->symbols, sizeof(Symbol) * current->capacity);
     }
 
-    current->symbols[current->count++] = (Symbol){ .name = name };
+    current->symbols[current->count++] = (Symbol){ .name = name, .declaration = declaration };
 
     return true;
 }
 
-static void analyzeFunctionDeclaration(Analyzer *analyzer, FunctionDeclaration function) {
-    if (!declareSymbol(&analyzer->table, function.name)) {
+static void analyzeFunctionDeclaration(Analyzer *analyzer, AstExpr *functionExpr) {
+    FunctionDeclaration function = functionExpr->asFunction;
+
+    if (!declareSymbol(&analyzer->table, function.name, functionExpr)) {
         raiseDuplicateSymbol(analyzer, function.name);
     }
 
     pushScope(&analyzer->table);
 
     for (int i = 0; i < function.paramCount; i++) {
-        if (!declareSymbol(&analyzer->table, function.parameters[i].name)) {
+                                                            // TODO!: fix this at some point
+        if (!declareSymbol(&analyzer->table, function.parameters[i].name, NULL)) {
             raiseDuplicateSymbol(analyzer, function.parameters[i].name);
         }
     }
@@ -118,34 +147,118 @@ static void analyzeFunctionDeclaration(Analyzer *analyzer, FunctionDeclaration f
     popScope(&analyzer->table);
 }
 
-static bool symbolExists(SymbolTable *table, char *name) {
-    if (table->depth == 0) return false;
+static Symbol *retrieveSymbol(SymbolTable *table, char *name) {
+    if (table->depth == 0) return NULL;
 
     Scope *current = &table->scopes[table->depth - 1];
     for (int i = 0; i < current->count; i++) {
         if (strcmp(current->symbols[i].name, name) == 0) {
-            return true;
+            return &current->symbols[i];
         }
     }
 
-    return false;
+    return NULL;
 }
 
 static void analyzeAssignExpr(Analyzer *analyzer, AssignmentExpr assign) {
-    if (!symbolExists(&analyzer->table, assign.name)) {
+    Symbol *symbol = retrieveSymbol(&analyzer->table, assign.name);
+
+    if (!symbol) {
         raiseUndefinedSymbol(analyzer, assign.name);
         return;
     }
 
-
+    if (symbol->declaration->type == AST_LET) {
+        if (symbol->declaration->asLet.isConstant) {
+            raiseConstantCannotBeReassigned(analyzer, symbol->declaration->asLet.name);
+        }
+    }
 }
 
-static void analyzeLet(Analyzer *analyzer, LetDeclaration let) {
-    if (!declareSymbol(&analyzer->table, let.name)) {
+static ConstEvalResult newConstant(long value) {
+    return (ConstEvalResult){ .isConstant = true, .value = value };
+}
+
+static ConstEvalResult newNonConstant() {
+    return (ConstEvalResult){ .isConstant = false };
+}
+
+static ConstEvalResult evaluateConstExpr(AstExpr *expr) {
+    switch (expr->type) {
+        case AST_INTEGER_LITERAL: {
+            return newConstant(expr->asInteger.value);
+        }
+        case AST_BINARY: {
+            ConstEvalResult leftValue = evaluateConstExpr(expr->asBinary.left);
+            ConstEvalResult rightValue = evaluateConstExpr(expr->asBinary.right);
+            
+            if (!leftValue.isConstant || !rightValue.isConstant) {
+                return newNonConstant();
+            }
+
+            switch (expr->asBinary.operator) {
+                case OP_PLUS: {
+                    return newConstant(leftValue.value + rightValue.value);
+                }
+                case OP_MINUS: {
+                    return newConstant(leftValue.value - rightValue.value);
+                }
+                case OP_DEREF: {
+                    return newConstant(leftValue.value * rightValue.value);
+                }
+                case OP_DIVIDE: {
+                    return newConstant(leftValue.value / rightValue.value);
+                }
+                default: {
+                    return newNonConstant();
+                }
+            }
+        }
+        case AST_UNARY: {
+            ConstEvalResult rightValue = evaluateConstExpr(expr->asUnary.right);
+
+            switch (expr->asUnary.operator) {
+                case OP_MINUS: {
+                    return newConstant(-rightValue.value);
+                }
+                default: {
+                    return newNonConstant();
+                }
+            }
+        }
+        default: {
+            return newNonConstant();
+        }
+    }
+}
+
+static void checkBitOverflows(Analyzer *analyzer, TypeExpr type, long value, char *name) {
+    if (strcmp(type.name, "i8") == 0) {
+        if (value > INT8_MAX) {
+            raiseIntOverflow(analyzer, value, name, type.name);
+        } else if (value < INT8_MIN) {
+            raiseIntUnderflow(analyzer, value, name, type.name);
+        }
+    } else if (strcmp(type.name, "u8") == 0) {
+        if (value > UINT8_MAX) {
+            raiseIntOverflow(analyzer, value, name, type.name);
+        } else if (value < 0) {
+            raiseIntUnderflow(analyzer, value, name, type.name);
+        }
+    }
+}
+
+static void analyzeLet(Analyzer *analyzer, AstExpr *letExpr) {
+    LetDeclaration let = letExpr->asLet;
+    
+    if (!declareSymbol(&analyzer->table, let.name, letExpr)) {
         raiseDuplicateSymbol(analyzer, let.name);
     }
 
     analyzeExpr(analyzer, let.value);
+
+    ConstEvalResult result = evaluateConstExpr(let.value);
+    checkBitOverflows(analyzer, let.type, result.value, let.name);
 }
 
 static void analyzeReturnStatement(Analyzer *analyzer, ReturnStatement returnStatement) {
@@ -184,7 +297,7 @@ static void analyzeWhile(Analyzer *analyzer, WhileStatement whileStatement) {
 }
 
 static void analyzeCallExpr(Analyzer *analyzer, CallExpr call) {
-    if (!symbolExists(&analyzer->table, call.name)) {
+    if (!retrieveSymbol(&analyzer->table, call.name)) {
         // fix to search outer scopes not just current
         // raiseUndefinedSymbol(analyzer, call.name);
     }
@@ -193,7 +306,7 @@ static void analyzeCallExpr(Analyzer *analyzer, CallExpr call) {
 static void analyzeExpr(Analyzer *analyzer, AstExpr *expr) {
     switch (expr->type) {
         case AST_LET: {
-            analyzeLet(analyzer, expr->asLet);
+            analyzeLet(analyzer, expr);
             break;
         }
         case AST_ASSIGN_EXPR: {
@@ -203,20 +316,20 @@ static void analyzeExpr(Analyzer *analyzer, AstExpr *expr) {
         case AST_FOR: {
             break;
         }
+        case AST_PROPERTY_ACCESS: {
+            break;
+        }
         case AST_MATCH: {
             break;
         }
         case AST_ENUM: {
             break;
         }
-        case AST_PROPERTY_ACCESS: {
-            break;
-        }
         case AST_STRUCT_INITIALIZER: {
             break;
         }
         case AST_FUNCTION_DECLARATION: {
-            analyzeFunctionDeclaration(analyzer, expr->asFunction);
+            analyzeFunctionDeclaration(analyzer, expr);
             break;
         }
         case AST_RETURN: {

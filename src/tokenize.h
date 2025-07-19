@@ -29,6 +29,7 @@ typedef enum {
     TOKEN_MATCH,
     TOKEN_ENUM,
     TOKEN_MODULE,
+    TOKEN_CONST,
 
     TOKEN_SINGLE_EQUALS,
     TOKEN_COLON,

@@ -62,6 +62,7 @@ static void initKeywords(Lexer *l) {
     newKeyword(l, "as", TOKEN_AS);
     newKeyword(l, "match", TOKEN_MATCH);
     newKeyword(l, "enum", TOKEN_ENUM);
+    newKeyword(l, "const", TOKEN_CONST);
 }
 
 Lexer newLexer(char *filePath, char *source, bool debug) {
@@ -315,10 +316,12 @@ static Token tokenizeChar(Lexer *l) {
 }
 
 static Token tokenizeNext(Lexer *l) {
-    if (isdigit(currentChar(l))) return tokenizeNumber(l);
-    else if (isalpha(currentChar(l))) return tokenizeIdentifier(l);
-    else if (currentChar(l) == '\"') return tokenizeString(l);
-    else if (currentChar(l) == '\'') return tokenizeChar(l);
+    char c = currentChar(l);
+
+    if (isdigit(c)) return tokenizeNumber(l);
+    else if (isalpha(c) || c == '_') return tokenizeIdentifier(l);
+    else if (c == '\"') return tokenizeString(l);
+    else if (c == '\'') return tokenizeChar(l);
 
     return tokenizeSymbol(l);
 }
