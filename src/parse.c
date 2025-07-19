@@ -656,7 +656,12 @@ static AstExpr *parsePrimary(Parser *p) {
             return newGroupingExpr(expr);
         }
         case TOKEN_INTEGER: {
-            return newIntegerExpr(atol(token.lexeme));
+            unsigned long long value = strtoull(token.lexeme, NULL, 10);
+            printf("val: %llu", value);
+
+            AstExpr *expr = newIntegerExpr(value);
+
+            return expr;
         }
         case TOKEN_FLOAT: {
             return newFloatExpr(atof(token.lexeme));

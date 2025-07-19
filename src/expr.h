@@ -74,7 +74,7 @@ typedef struct {
 } GroupingExpression;
 
 typedef struct {
-    long value;
+    uint64_t value;
 } IntegerLiteralExpr;
 
 typedef struct {
