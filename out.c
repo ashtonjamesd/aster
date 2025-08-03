@@ -5,5 +5,11 @@ signed char main();
 
 
 signed char main() {
-unsigned long _ = 2147483649;
+signed char y = 10;
+_Bool x;
+switch (y) {
+default:
+x=true;
+break;
+}
 }

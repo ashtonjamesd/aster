@@ -213,6 +213,24 @@ static void emitLetMatchAssignment(Transpiler *t, LetDeclaration let, MatchExpr 
     emitNewline(t);
 
     for (int i = 0; i < match.caseCount; i++) {
+        if (match.cases[i].isElseCase) {
+            emit(t, "default");
+            emit(t, ":");
+            emitNewline(t); 
+
+            emit(t, let.name);
+            emit(t, "=");
+            emitExpr(t, match.cases[i].expression);
+            emitSemicolon(t);
+            emitNewline(t);
+
+            emit(t, "break");
+            emitSemicolon(t);
+
+            emitNewline(t);
+            continue;
+        }
+
         emit(t, "case");
         emitSpace(t);
         emitExpr(t, match.cases[i].pattern);

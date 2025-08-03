@@ -288,6 +288,7 @@ static void analyzeAssignExpr(Analyzer *analyzer, AssignmentExpr assign) {
 static void analyzeLet(Analyzer *analyzer, AstExpr *letExpr) {
     LetDeclaration let = letExpr->asLet;
     
+
     if (!declareSymbol(&analyzer->table, let.name, letExpr)) {
         raiseDuplicateSymbol(analyzer, let.name);
     }
@@ -295,6 +296,7 @@ static void analyzeLet(Analyzer *analyzer, AstExpr *letExpr) {
     analyzeExpr(analyzer, let.value);
 
     ConstEvalResult result = evaluateConstExpr(let.value);
+    
     checkBitOverflows(analyzer, let.type, result.value, let.name);
 }
 

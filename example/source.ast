@@ -1,3 +1,7 @@
-pub fn main(): i8 { 
+pub fn main(): i8 {
+    let y: i8 = 10
 
+    let x: bool = match y {
+        else => true
+    }
 }

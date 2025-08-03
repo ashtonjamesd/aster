@@ -21,14 +21,14 @@ fn test(): i8 {
 }
 
 fn isEven(n: i32): bool {
-    return match n {
-        n mod 2 == 0 => true
-        n mod 2 != 0 => false
+    return match n mod 2 {
+        0 => true,
+        1 => false
     }
 }
 
-fn boolToInt(b: bool): i8 {
-    return match b {
+fn boolToInt(x: bool): i8 {
+    return match x {
         true  => 1,
         false => 0
     }
