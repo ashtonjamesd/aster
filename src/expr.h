@@ -74,7 +74,7 @@ typedef struct {
 } GroupingExpression;
 
 typedef struct {
-    uint64_t value;
+    long long value;
 } IntegerLiteralExpr;
 
 typedef struct {
@@ -254,6 +254,7 @@ typedef struct {
 
     // represents a single case
     // may be null
+    // -should it be null though.. NO! 
     MatchCaseExpr *elseCase;
 } MatchExpr;
 
@@ -302,7 +303,7 @@ struct AstExpr {
     };
 };
 
-AstExpr *newIntegerExpr(int value);
+AstExpr *newIntegerExpr(long long value);
 AstExpr *newFloatExpr(float value);
 AstExpr *newIdentifierExpr(char *name);
 AstExpr *newStringExpr(char *name);

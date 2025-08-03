@@ -5,5 +5,5 @@ signed char main();
 
 
 signed char main() {
-unsigned long _ = -1;
+unsigned long _ = 2147483649;
 }

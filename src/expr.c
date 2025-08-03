@@ -13,7 +13,7 @@ static AstExpr *newExpr(AstType type) {
     return expr;
 }
 
-AstExpr *newIntegerExpr(int value) {
+AstExpr *newIntegerExpr(long long value) {
     AstExpr *expr = newExpr(AST_INTEGER_LITERAL);
 
     expr->asInteger.value = value;

@@ -340,7 +340,7 @@ static void emitAssignExpression(Transpiler *t, AssignmentExpr assign) {
 }
 
 static void emitIntegerLiteral(Transpiler *t, IntegerLiteralExpr integer) {
-    fprintf(t->fptr, "%ld", integer.value);
+    fprintf(t->fptr, "%lld", integer.value);
 }
 
 static void emitFloatLiteral(Transpiler *t, FloatLiteralExpr floatLiteral) {

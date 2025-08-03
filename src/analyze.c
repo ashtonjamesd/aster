@@ -175,7 +175,7 @@ static ConstEvalResult evaluateConstExpr(AstExpr *expr) {
     }
 }
 
-static void checkBitOverflows(Analyzer *analyzer, TypeExpr type, uint64_t value, char *name) {
+static void checkBitOverflows(Analyzer *analyzer, TypeExpr type, long long value, char *name) {
     if (strcmp(type.name, "i8") == 0) {
         if (value > INT8_MAX) {
             raiseIntOverflow(analyzer, value, name, type.name);
@@ -219,6 +219,7 @@ static void checkBitOverflows(Analyzer *analyzer, TypeExpr type, uint64_t value,
             raiseIntUnderflow(analyzer, value, name, type.name);
         }
     } else if (strcmp(type.name, "u64") == 0) {
+        // TODO! don't even know how to fix this warning
         if (value > UINT64_MAX) {
             raiseIntOverflow(analyzer, value, name, type.name);
         } else if (value < 0) {

@@ -115,6 +115,11 @@ ExecResult runCli(int argc, char **argv) {
     bool isFile = false;
     char *path = NULL;
 
+    if (argc < 2) {
+        fprintf(stderr, "usage: aster <command>\n");
+        return EXEC_FAIL;
+    }
+
     if (strcmp(argv[1], "create") == 0) {
         if (argc < 3) {
             fprintf(stderr, "usage: aster create <project_name>\n");

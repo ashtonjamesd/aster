@@ -222,7 +222,7 @@ static void printExpr(AstExpr expr, int indent) {
 
     switch (expr.type) {
         case AST_INTEGER_LITERAL: {
-            printf("integer literal: %ld\n", expr.asInteger.value);
+            printf("integer literal: %lld\n", expr.asInteger.value);
             break;
         }
         case AST_BOOL_LITERAL: {
@@ -656,8 +656,8 @@ static AstExpr *parsePrimary(Parser *p) {
             return newGroupingExpr(expr);
         }
         case TOKEN_INTEGER: {
-            unsigned long long value = strtoull(token.lexeme, NULL, 10);
-            printf("val: %llu", value);
+            long long value = strtoll(token.lexeme, NULL, 10);
+            // printf("val: %llu", value);
 
             AstExpr *expr = newIntegerExpr(value);
 
