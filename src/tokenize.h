@@ -30,6 +30,7 @@ typedef enum {
     TOKEN_ENUM,
     TOKEN_MODULE,
     TOKEN_CONST,
+    TOKEN_DEFER,
 
     TOKEN_SINGLE_EQUALS,
     TOKEN_COLON,
@@ -38,6 +39,7 @@ typedef enum {
     TOKEN_COMMA,
     TOKEN_LEFT_PAREN,
     TOKEN_RIGHT_PAREN,
+    TOKEN_SEMICOLON,
 
     TOKEN_STAR,
     TOKEN_AMPERSAND,

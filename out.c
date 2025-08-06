@@ -5,11 +5,9 @@ signed char main();
 
 
 signed char main() {
-signed char y = 10;
-_Bool x;
-switch (y) {
-default:
-x=true;
-break;
-}
+signed char x = 10;
+x = x*2;
+
+// deferred
+x = x+1;
 }

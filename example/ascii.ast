@@ -45,11 +45,14 @@ pub struct ascii {
     pub fn isBin(c: i8): bool => c == '1' or c == '0'
 
     pub fn isWhitespace(c: i8): bool {
-        return c == ' '
-            or c == '\t'
-            or c == '\r'
-            or c == '\n'
-            or c == '\v'
-            or c == '\f'
+        return match c {
+            ' '  => true,
+            '\t' => true,
+            '\r' => true,
+            '\n' => true,
+            '\v' => true,
+            '\f' => true,
+            else => false
+        }
     }
 }

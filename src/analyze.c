@@ -421,6 +421,30 @@ static void analyzeExpr(Analyzer *analyzer, AstExpr *expr) {
         case AST_CHAR_LITERAL: {
             break;
         }
+        case AST_GROUPING: {
+            break;
+        }
+        case AST_BLOCK: {
+            break;
+        }
+        case AST_FUNCTION_PARAMETER: {
+            break;
+        }
+        case AST_STRUCT_FIELD: {
+            break;
+        }
+        case AST_DEFER_STATEMENT: {
+            break;
+        }
+        case AST_IF: {
+            break;
+        }
+        case AST_MATCH_CASE: {
+            break;
+        }
+        case AST_STRUCT_FIELD_INIT: {
+            break;
+        }
         case AST_ERR_EXPR: {
             exitWithInternalCompilerError("found error expression in analyzer");
             break;

@@ -1,7 +1,6 @@
 pub fn main(): i8 {
-    let y: i8 = 10
+    let x: i8 = 10
+    defer x = x + 1
 
-    let x: bool = match y {
-        else => true
-    }
+    x = x * 2
 }

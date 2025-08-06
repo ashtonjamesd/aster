@@ -8,9 +8,7 @@
 #include "tokenize.h"
 #include "analyze.h"
 
-void compileErrFromParse(Parser *parser, char *message) {
-    parser->hadErr = true;
-    
+static void compileMessageFromParse(Parser *parser, char *message) {
     Token errToken = parser->tokens[parser->position];
 
     if (parser->position >= parser->tokenCount) {
@@ -42,6 +40,16 @@ void compileErrFromParse(Parser *parser, char *message) {
         printf("%s", parser->tokens[i].lexeme);
     }
     printf("\n\n");
+}
+
+void compileWarningFromParse(Parser *parser, char *message) {
+    compileMessageFromParse(parser, message);
+}
+
+void compileErrFromParse(Parser *parser, char *message) {
+    parser->hadErr = true;
+
+    compileMessageFromParse(parser, message);
 }
 
 void compileErrFromTokenize(Lexer *lexer, char *message) {

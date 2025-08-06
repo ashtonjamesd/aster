@@ -103,6 +103,10 @@ static void freeExpr(AstExpr *expr) {
             free(expr->asIdentifier.name);
             break;
         }
+        case AST_DEFER_STATEMENT: {
+            free(expr->asDefer.statement);
+            break;
+        }
         case AST_STRING_LITERAL: {
             free(expr->asString.value);
             break;
@@ -274,6 +278,12 @@ static void printExpr(AstExpr expr, int indent) {
             printIndent(indent + 2);
             printf("right: \n");
             printExpr(*expr.asUnary.right, indent + 4);
+            break;
+        }
+        case AST_DEFER_STATEMENT: {
+            printf("defer statement\n");
+            
+            printExpr(*expr.asDefer.statement, indent + 2);
             break;
         }
         case AST_BINARY: {
@@ -1006,6 +1016,11 @@ static AstExpr *parseLet(Parser *p) {
         }
     }
 
+    if (match(p, TOKEN_SEMICOLON)) {
+        compileWarningFromParse(p, "unnecessary semicolon");
+        advance(p);
+    }
+
     return newLetDeclaration(name.lexeme, typeExpr, value, isConstant);
 }
 
@@ -1544,8 +1559,14 @@ static AstExpr *parseMatch(Parser *p) {
                     return error(p, "expected '}'");
                 }
             } else {
-                AstExpr *expr = parseExpr(p);
-                if (isErr(expr)) return expr;
+                AstExpr *expr;
+                if (match(p, TOKEN_MATCH)) {
+                    expr = parseMatch(p);
+                    if (isErr(expr)) return expr;
+                } else {
+                    expr = parseExpr(p);
+                    if (isErr(expr)) return expr;
+                }
 
                 caseExpressionExpr = expr;
             }
@@ -1567,6 +1588,15 @@ static AstExpr *parseMatch(Parser *p) {
     }
 
     return newMatchExpr(expression, cases, caseCount, caseCapacity);
+}
+
+static AstExpr *parseDefer(Parser *p) {
+    advance(p);
+
+    AstExpr *statement = parseStatement(p);
+    if (isErr(statement)) return statement;
+
+    return newDeferStatement(statement);
 }
 
 static AstExpr *parseStatement(Parser *p) {
@@ -1620,6 +1650,9 @@ static AstExpr *parseStatement(Parser *p) {
         }
         case TOKEN_NEXT: {
             return parseNext(p);
+        }
+        case TOKEN_DEFER: {
+            return parseDefer(p);
         }
         default: {
             return parseExpr(p);

@@ -178,6 +178,8 @@ xor
 
 The following defines the formal grammar for the Aster programming language.
 
+The grammar includes additional concepts that have not yet implemented.
+
 ```
 <program> ::= <statements>
 

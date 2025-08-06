@@ -1,0 +1,21 @@
+// @generic T (maybe)
+pub interface struct Allocable {
+    pub fn free(): u0
+}
+
+pub struct DeferExpr with Allocable {
+    // forced to implement a free function
+    pub fn free(): u0 {
+        // free expr
+    }
+
+    pub fn new(statement: rawptr): rawptr { // would return expr
+        return statement
+    }
+}
+
+
+pub fn main(): u0 {
+    let x: rawptr = DeferExpr.new() // pass in stuff
+    defer x.free() // defer freeing when the current function scope closes
+}

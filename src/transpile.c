@@ -85,9 +85,28 @@ static void emitFunctionDeclaration(Transpiler *t, FunctionDeclaration function)
     emitLeftBrace(t);
     emitNewline(t);
 
+    int *deferIndexes = malloc(sizeof(int));
+    int deferIndexesCount = 0;
+    int deferIndexesCapacity = 1;
+
     if (!function.isLambda) {
         for (int i = 0; i < function.block.count; i++) {
+            if (function.block.body[i]->type == AST_DEFER_STATEMENT) {
+                if (deferIndexesCount >= deferIndexesCapacity) {
+                    deferIndexesCapacity *= 2;
+                    deferIndexes = realloc(deferIndexes, deferIndexesCapacity * sizeof(int));
+                }
+                deferIndexes[deferIndexesCount++] = i;
+
+                continue;
+            }
+
             emitExpr(t, function.block.body[i]);
+        }
+
+        emit(t, "\n// deferred\n");
+        for (int i = 0; i < deferIndexesCount; i++) {
+            emitExpr(t, function.block.body[deferIndexes[i]]);
         }
     } else {
         emit(t, "return");
@@ -98,7 +117,8 @@ static void emitFunctionDeclaration(Transpiler *t, FunctionDeclaration function)
         emitNewline(t);
     }
 
-    // emitNewline(t);
+
+
     emitRightBrace(t);
     emitNewline(t);
 }
@@ -183,7 +203,7 @@ static void emitWhileStatement(Transpiler *t, WhileStatement whileStatement) {
         emitExpr(t, whileStatement.block.body[i]);
     }
 
-    emitExpr(t, whileStatement.alteration);
+    if (whileStatement.alteration) emitExpr(t, whileStatement.alteration);
 
     emitRightBrace(t);
     emitNewline(t);
@@ -562,6 +582,10 @@ static void emitStructInit(Transpiler *t, StructInitializer structInit) {
     emitRightBrace(t);
 }
 
+static void emitDeferStatement(Transpiler *t, DeferStatement defer) {
+    emitExpr(t, defer.statement);
+}
+
 static void emitExpr(Transpiler *t, AstExpr *expr) {
     switch (expr->type) {
         case AST_FUNCTION_DECLARATION: {
@@ -602,6 +626,10 @@ static void emitExpr(Transpiler *t, AstExpr *expr) {
         }
         case AST_ASSIGN_EXPR: {
             emitAssignExpression(t, expr->asAssign);
+            break;
+        }
+        case AST_DEFER_STATEMENT: {
+            emitDeferStatement(t, expr->asDefer);
             break;
         }
         case AST_IF: {

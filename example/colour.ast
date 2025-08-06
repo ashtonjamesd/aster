@@ -8,6 +8,8 @@ pub struct Colour {
     pub b: u8
     pub a: u8
 
+    x: u8
+
     pub fn new(r: u8, g: u8, b: u8, a: u8): Colour {
         let colour: Colour = {
             r: r,

@@ -307,6 +307,14 @@ AstExpr *newStructFieldInit(char *name, AstExpr *value) {
     return expr;
 }
 
+AstExpr *newDeferStatement(AstExpr *statement) {
+    AstExpr *expr = newExpr(AST_DEFER_STATEMENT);
+
+    expr->asDefer.statement = statement;
+
+    return expr;
+}
+
 AstExpr *newErrExpr() {
     AstExpr *expr = newExpr(AST_ERR_EXPR);
 
