@@ -20,5 +20,6 @@ pub fn factorial(n: i32): i32 {
 }
 
 // returns the absolute value of an integer 'x'
+@inline
 pub fn abs(x: i32): i32 => if x < 0 then -x else x
 ```

@@ -61,9 +61,27 @@ static void raiseNoEntryPointErr(Analyzer *analyzer) {
     );
 }
 
+static void raiseEntryPointMustBePublic(Analyzer *analyzer) {
+    compileErrFromAnalyzer(analyzer, 
+        "program entry point 'main' must be declared 'pub'\n"
+    );
+}
+
+static void raiseEntryPointCannotBeInline(Analyzer *analyzer) {
+    compileErrFromAnalyzer(analyzer, 
+        "program entry point 'main' cannot be declared as inline'\n"
+    );
+}
+
 static void raiseDuplicateSymbol(Analyzer *analyzer, char *name) {
     compileErrFromAnalyzer(analyzer, 
         "symbol '%s' already defined in this scope\n", name
+    );
+}
+
+static void raiseVoidFunctionCannotBeLambda(Analyzer *analyzer, char *name) {
+    compileErrFromAnalyzer(analyzer, 
+        "function '%s' cannot both return void and be an arrow function \n", name
     );
 }
 
@@ -233,6 +251,10 @@ static void analyzeFunctionDeclaration(Analyzer *analyzer, AstExpr *functionExpr
 
     if (!declareSymbol(&analyzer->table, function.name, functionExpr)) {
         raiseDuplicateSymbol(analyzer, function.name);
+    }
+
+    if (function.isLambda && strcmp("u0", function.returnType.name) == 0) {
+        raiseVoidFunctionCannotBeLambda(analyzer, function.name);
     }
 
     pushScope(&analyzer->table);
@@ -462,12 +484,22 @@ void analyze(Analyzer *analyzer) {
     }
 
     bool hasEntryPoint = false;
+    bool isPublicEntryPoint = false;
+    bool isInlineEntryPoint = false;
     for (int i = 0; i < analyzer->parser->ast.exprCount; i++) {
         AstExpr *expr = analyzer->parser->ast.exprs[i];
 
         if (!hasEntryPoint && expr->type == AST_FUNCTION_DECLARATION) {
             if (strcmp(expr->asFunction.name, "main") == 0) {
                 hasEntryPoint = true;
+
+                if (expr->asFunction.isPublic) {
+                    isPublicEntryPoint = true;
+                }
+
+                if (expr->asFunction.isInline) {
+                    isInlineEntryPoint = true;
+                }
             }
         }
 
@@ -476,6 +508,13 @@ void analyze(Analyzer *analyzer) {
 
     if (!hasEntryPoint) {
         raiseNoEntryPointErr(analyzer);
-        return;
+    }
+
+    if (!isPublicEntryPoint) {
+        raiseEntryPointMustBePublic(analyzer);
+    }
+
+    if (isInlineEntryPoint) {
+        raiseEntryPointCannotBeInline(analyzer);
     }
 }

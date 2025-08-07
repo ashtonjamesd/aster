@@ -164,6 +164,7 @@ typedef struct {
     AstExpr           *lambdaExpr;
 
     bool               isPublic;
+    bool               isInline;
 } FunctionDeclaration;
 
 typedef struct {
@@ -315,11 +316,10 @@ AstExpr *newIdentifierExpr(char *name);
 AstExpr *newStringExpr(char *name);
 AstExpr *newCharExpr(char *name);
 AstExpr *newBoolExpr(bool value);
-
 AstExpr *newLetDeclaration(char *name, AstExpr *type, AstExpr *value, bool isConstant);
 AstExpr *newTypeExpr(char *name, uint8_t ptrDepth);
 AstExpr *newAssignExpr(char *name, AstExpr *value, uint8_t ptrDepth);
-AstExpr *newFunctionDeclaration(char *name, TypeExpr returnType, BlockExpr body, int paramCount, int paramCapacity, FunctionParameter *parameters, bool isLambda, AstExpr *lambdaExpr, bool isPublic);
+AstExpr *newFunctionDeclaration(char *name, TypeExpr returnType, BlockExpr body, int paramCount, int paramCapacity, FunctionParameter *parameters, bool isLambda, AstExpr *lambdaExpr, bool isPublic, bool isInline);
 AstExpr *newBlockExpr(AstExpr **body, int count, int capacity);
 AstExpr *newReturnStatement(AstExpr *expr);
 AstExpr *newFunctionParameter(char *name, AstExpr *type);

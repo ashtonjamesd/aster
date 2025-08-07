@@ -91,7 +91,7 @@ AstExpr *newAssignExpr(char *name, AstExpr *value, uint8_t ptrDepth) {
     return expr;
 }
 
-AstExpr *newFunctionDeclaration(char *name, TypeExpr returnType, BlockExpr body, int paramCount, int paramCapacity, FunctionParameter *parameters, bool isLambda, AstExpr *lambdaExpr, bool isPublic) {
+AstExpr *newFunctionDeclaration(char *name, TypeExpr returnType, BlockExpr body, int paramCount, int paramCapacity, FunctionParameter *parameters, bool isLambda, AstExpr *lambdaExpr, bool isPublic, bool isInline) {
     AstExpr *expr = newExpr(AST_FUNCTION_DECLARATION);
 
     expr->asFunction.name = strdup(name);
@@ -103,6 +103,7 @@ AstExpr *newFunctionDeclaration(char *name, TypeExpr returnType, BlockExpr body,
     expr->asFunction.isLambda = isLambda;
     expr->asFunction.lambdaExpr = lambdaExpr;
     expr->asFunction.isPublic = isPublic;
+    expr->asFunction.isInline = isInline;
 
     return expr;
 }

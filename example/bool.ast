@@ -1,0 +1,5 @@
+pub fn main: i8 => 1
+
+pub struct boolean {
+    pub fn true: bool => true
+}

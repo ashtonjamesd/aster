@@ -36,6 +36,8 @@ Parser newParser(char *filePath, Token *tokens, int tokenCount, bool debug) {
     p.hadErr = false;
     p.debug = debug;
 
+    p.isInlineTagState = false;
+
     return p;
 }
 
@@ -1086,7 +1088,7 @@ static AstExpr *parseFunction(Parser *p) {
     // this allows functions with no parameters to omit the '()'
     if (!match(p, TOKEN_COLON)) {
         if (!expect(p, TOKEN_LEFT_PAREN)) {
-            return error(p, "expected '('");
+            return error(p, "expected '(' or ':'");
         }
 
         if (!match(p, TOKEN_RIGHT_PAREN)) {
@@ -1159,7 +1161,8 @@ static AstExpr *parseFunction(Parser *p) {
     BlockExpr block = body ? body->asBlock : (BlockExpr){ .body = NULL, .count = 0 };
 
     AstExpr* functionDeclaration = newFunctionDeclaration(
-        name.lexeme, returnType->asType, block, paramCount, paramCapacity, parameters, isLambda, lambdaExpr, isPublic
+        name.lexeme, returnType->asType, block, paramCount, paramCapacity, 
+        parameters, isLambda, lambdaExpr, isPublic, p->isInlineTagState
     );
 
     free(returnType);
@@ -1602,12 +1605,32 @@ static AstExpr *parseDefer(Parser *p) {
     return newDeferStatement(statement);
 }
 
+static AstExpr *parseAt(Parser *p) {
+    advance(p);
+
+    Token atToken = currentToken(p);
+    if (strcmp("inline", atToken.lexeme) == 0) {
+        advance(p);
+        p->isInlineTagState = true;
+    } else {
+        return error(p, "unknown tag");
+    }
+
+    AstExpr *expr = parseStatement(p);
+    p->isInlineTagState = false;
+
+    return expr;
+}
+
 static AstExpr *parseStatement(Parser *p) {
     Token token = currentToken(p);
 
     switch (token.type) {
         case TOKEN_LET: {
             return parseLet(p);
+        }
+        case TOKEN_AT: {
+            return parseAt(p);
         }
         case TOKEN_CONST: {
             return parseLet(p);

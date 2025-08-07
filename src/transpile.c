@@ -65,6 +65,11 @@ static void emitTypeExpression(Transpiler *t, TypeExpr type) {
 static void emitFunctionDeclaration(Transpiler *t, FunctionDeclaration function) {
     emitNewline(t);
 
+    if (function.isInline) {
+        emit(t, "inline");
+        emitSpace(t);
+    }
+
     emitTypeExpression(t, function.returnType);
     emit(t, function.name);
 
@@ -704,6 +709,11 @@ static void emitExpr(Transpiler *t, AstExpr *expr) {
 
 static void emitFunctionForwardDeclaration(Transpiler *t, FunctionDeclaration function) {
     emitNewline(t);
+
+    if (function.isInline) {
+        emit(t, "inline");
+        emitSpace(t);
+    }
 
     emitTypeExpression(t, function.returnType);
     emit(t, function.name);

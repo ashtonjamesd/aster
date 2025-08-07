@@ -228,6 +228,7 @@ static Token tokenizeSymbol(Lexer *l) {
         case '}': return newToken("}", TOKEN_RIGHT_BRACE, l);
         case ',': return newToken(",", TOKEN_COMMA, l);
         case ';': return newToken(";", TOKEN_SEMICOLON, l);
+        case '@': return newToken("@", TOKEN_AT, l);
         case '|': {
             if (currentChar(l) == '|') {
                 advance(l);

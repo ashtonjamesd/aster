@@ -40,6 +40,7 @@ typedef enum {
     TOKEN_LEFT_PAREN,
     TOKEN_RIGHT_PAREN,
     TOKEN_SEMICOLON,
+    TOKEN_AT,
 
     TOKEN_STAR,
     TOKEN_AMPERSAND,

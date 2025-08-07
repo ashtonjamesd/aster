@@ -21,6 +21,10 @@ typedef struct {
 
     bool   hadErr;
     bool   debug;
+
+    // whether the following declaration expression has been preceeded by a '@inline'
+    // set back to false after the applying expression finishes parsing
+    bool   isInlineTagState;
 } Parser;
 
 Parser newParser(char *filePath, Token *tokens, int tokenCount, bool debug);
