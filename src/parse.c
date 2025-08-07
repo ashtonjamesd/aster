@@ -1079,45 +1079,48 @@ static AstExpr *parseFunction(Parser *p) {
         return error(p, "expected identifier after 'fn'");
     }
 
-    if (!expect(p, TOKEN_LEFT_PAREN)) {
-        return error(p, "expected '('");
-    }
-
     FunctionParameter *parameters = malloc(sizeof(FunctionParameter));
     int paramCount = 0;
-    int paramCapacity = 1;  
+    int paramCapacity = 1;
 
-    if (!match(p, TOKEN_RIGHT_PAREN)) {
-        recede(p);
-        
-        do {
-            advance(p);
+    // this allows functions with no parameters to omit the '()'
+    if (!match(p, TOKEN_COLON)) {
+        if (!expect(p, TOKEN_LEFT_PAREN)) {
+            return error(p, "expected '('");
+        }
 
-            Token name = currentToken(p);
-            if (!expect(p, TOKEN_IDENTIFIER)) {
-                return error(p, "expected identifier");
-            }
+        if (!match(p, TOKEN_RIGHT_PAREN)) {
+            recede(p);
+            
+            do {
+                advance(p);
 
-            if (!expect(p, TOKEN_COLON)) {
-                return error(p, "expected ':' and then a type declaration");
-            }
+                Token name = currentToken(p);
+                if (!expect(p, TOKEN_IDENTIFIER)) {
+                    return error(p, "expected identifier");
+                }
 
-            AstExpr *type = parseType(p);
-            if (isErr(type)) return type;
+                if (!expect(p, TOKEN_COLON)) {
+                    return error(p, "expected ':' and then a type declaration");
+                }
 
-            AstExpr *parameter = newFunctionParameter(name.lexeme, type);
+                AstExpr *type = parseType(p);
+                if (isErr(type)) return type;
 
-            if (paramCount >= paramCapacity) {
-                paramCapacity *= 2;
-                parameters = realloc(parameters, sizeof(FunctionParameter) * paramCapacity);
-            }
-            parameters[paramCount++] = parameter->asParameter;
+                AstExpr *parameter = newFunctionParameter(name.lexeme, type);
 
-        } while (match(p, TOKEN_COMMA));
-    }
+                if (paramCount >= paramCapacity) {
+                    paramCapacity *= 2;
+                    parameters = realloc(parameters, sizeof(FunctionParameter) * paramCapacity);
+                }
+                parameters[paramCount++] = parameter->asParameter;
 
-    if (!expect(p, TOKEN_RIGHT_PAREN)) {
-        return error(p, "expected ')'");
+            } while (match(p, TOKEN_COMMA));
+        }
+
+        if (!expect(p, TOKEN_RIGHT_PAREN)) {
+            return error(p, "expected ')'");
+        }
     }
 
     if (!expect(p, TOKEN_COLON)) {

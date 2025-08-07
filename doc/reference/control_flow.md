@@ -78,3 +78,12 @@ for x in someArray {
     // ..
 }
 ```
+
+
+### Ternary Operators
+
+The syntax for ternary operators is as follows:
+
+```
+let x: i8 = if x < 0 then -x else x
+```

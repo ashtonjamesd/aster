@@ -1,13 +1,15 @@
-struct limits {
-    fn u8max(): u8 => 255
-    fn u8min(): u8 => 0
+pub fn main(): i8 => 0
 
-    fn i8max(): i8 => 127
-    fn i8max(): u8 => -127 - 1
+pub struct limits {
+    pub fn u8max: u8 => 255
+    pub fn u8min: u8 => 0
 
-    fn u16max(): u16 => 65535
-    fn u16min(): u16 => 0
+    pub fn i8max: i8 => 127
+    pub fn i8max: u8 => -127 - 1
 
-    fn i16max(): i16 => 32767
-    fn i16min(): i16 => -32767 - 1
+    pub fn u16max: u16 => 65535
+    pub fn u16min: u16 => 0
+
+    pub fn i16max: i16 => 32767
+    pub fn i16min: i16 => -32767 - 1
 }

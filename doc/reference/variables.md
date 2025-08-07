@@ -19,3 +19,9 @@ let s: *u8 = "Hello, World!"
 let x: i8 = 1
 let xPtr: *i8 = &x;
 ```
+
+Immutable variables can be declared using `const` rather than `let`.
+
+```
+const x: i8 = 1
+```
