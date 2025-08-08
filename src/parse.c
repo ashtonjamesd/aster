@@ -33,6 +33,10 @@ Parser newParser(char *filePath, Token *tokens, int tokenCount, bool debug) {
         .exprs = malloc(sizeof(AstExpr *))
     };
 
+    if (!p.ast.exprs) {
+        exitWithInternalCompilerError("memory allocation failed");
+    }
+
     p.hadErr = false;
     p.debug = debug;
 
@@ -73,6 +77,10 @@ static void freeExpr(AstExpr *expr) {
             }
             free(expr->asEnum.name);
             free(expr->asEnum.values);
+            break;
+        }
+        case AST_EMBED: {
+            free(expr->asEmbed.embedSource);
             break;
         }
         case AST_TERNARY: {
@@ -253,6 +261,10 @@ static void printExpr(AstExpr expr, int indent) {
         }
         case AST_ERR_EXPR: {
             printf("error expression\n");
+            break;
+        }
+        case AST_EMBED: {
+            printf("embed: %s\n", expr.asEmbed.embedSource);
             break;
         }
         case AST_NEXT: {
@@ -615,6 +627,9 @@ static AstExpr *parseStructFieldInit(Parser *p) {
     int fieldCount = 0;
     int fieldCapacity = 1;
     StructFieldInit *fields = malloc(sizeof(StructFieldInit));
+    if (!fields) {
+        exitWithInternalCompilerError("memory allocation failed");
+    }
 
     if (!match(p, TOKEN_RIGHT_BRACE)) {
         recede(p);
@@ -669,8 +684,6 @@ static AstExpr *parsePrimary(Parser *p) {
         }
         case TOKEN_INTEGER: {
             long long value = strtoll(token.lexeme, NULL, 10);
-            // printf("val: %llu", value);
-
             AstExpr *expr = newIntegerExpr(value);
 
             return expr;
@@ -1051,6 +1064,10 @@ static AstExpr *parseBlock(Parser *p) {
     int capacity = 1;
 
     AstExpr **body = malloc(sizeof(AstExpr *));
+    if (!body) {
+        exitWithInternalCompilerError("memory allocation failed");
+    }
+
     while (!match(p, TOKEN_RIGHT_BRACE)) {
         AstExpr *expr = parseStatement(p);
         if (isErr(expr)) return expr;
@@ -1082,6 +1099,10 @@ static AstExpr *parseFunction(Parser *p) {
     }
 
     FunctionParameter *parameters = malloc(sizeof(FunctionParameter));
+    if (!parameters) {
+        exitWithInternalCompilerError("memory allocation failed");
+    }
+    
     int paramCount = 0;
     int paramCapacity = 1;
 
@@ -1210,6 +1231,10 @@ static AstExpr *parseStruct(Parser *p) {
     }
 
     AstExpr **members = malloc(sizeof(AstExpr *));
+    if (!members) {
+        exitWithInternalCompilerError("memory allocation failed");
+    }
+
     int memberCount = 0;
     int memberCapacity = 1;
 
@@ -1321,6 +1346,10 @@ static AstExpr *parseCallExpression(Parser *p) {
     }
 
     AstExpr **arguments = malloc(sizeof(AstExpr *));
+    if (!arguments) {
+        exitWithInternalCompilerError("memory allocation failed");
+    }
+
     int count = 0;
     int capacity = 1;
 
@@ -1416,6 +1445,10 @@ static AstExpr *parseEnum(Parser *p) {
     }
 
     char **values = malloc(sizeof(char *));
+    if (!values) {
+        exitWithInternalCompilerError("memory allocation failed");
+    }
+
     int valueCount = 0;
     int valueCapacity = 1;
 
@@ -1528,6 +1561,10 @@ static AstExpr *parseMatch(Parser *p) {
     }
 
     MatchCaseExpr *cases = malloc(sizeof(MatchCaseExpr));
+    if (!cases) {
+        exitWithInternalCompilerError("memory allocation failed");
+    }
+
     int caseCount = 0;
     int caseCapacity = 1;
 
@@ -1622,6 +1659,71 @@ static AstExpr *parseAt(Parser *p) {
     return expr;
 }
 
+static AstExpr *parseEmbed(Parser *p) {
+    advance(p);
+    if (!expect(p, TOKEN_LEFT_BRACE)) {
+        return error(p, "expected '{'");
+    }
+
+    char *embedContent = malloc(1);
+    int embedContentCapacity = 1;
+    int embedContentCount = 0;
+
+    if (!embedContent) {
+        exitWithInternalCompilerError("memory allocation failed");
+    }
+
+    int braceDepth = 1;
+
+    while (!isEnd(p) && braceDepth > 0) {
+        Token token = currentToken(p);
+        advance(p);
+
+        if (token.type == TOKEN_LEFT_BRACE) {
+            braceDepth++;
+        } else if (token.type == TOKEN_RIGHT_BRACE) {
+            braceDepth--;
+        }
+
+        if (braceDepth == 0) break;
+
+        int len = strlen(token.lexeme);
+        int spaceNeeded = len + 1;
+
+        if (embedContentCount + spaceNeeded >= embedContentCapacity) {
+            while (embedContentCount + spaceNeeded >= embedContentCapacity) {
+                embedContentCapacity *= 2;
+            }
+            embedContent = realloc(embedContent, embedContentCapacity);
+            if (!embedContent) {
+                exitWithInternalCompilerError("memory reallocation failed");
+            }
+        }
+
+        memcpy(embedContent + embedContentCount, token.lexeme, len);
+        embedContentCount += len;
+
+        embedContent[embedContentCount++] = ' ';
+    }
+
+    if (braceDepth != 0) {
+        return error(p, "unmatched '{' in embed block");
+    }
+
+    if (embedContentCount == 0 || embedContent[embedContentCount - 1] != '\0') {
+        if (embedContentCount >= embedContentCapacity) {
+            embedContent = realloc(embedContent, embedContentCapacity + 1);
+            if (!embedContent) {
+                exitWithInternalCompilerError("memory reallocation failed");
+            }
+        }
+        embedContent[embedContentCount - 1] = '\0';
+    }
+
+    return newEmbedStatement(embedContent);
+}
+
+
 static AstExpr *parseStatement(Parser *p) {
     Token token = currentToken(p);
 
@@ -1680,6 +1782,9 @@ static AstExpr *parseStatement(Parser *p) {
         case TOKEN_DEFER: {
             return parseDefer(p);
         }
+        case TOKEN_EMBED: {
+            return parseEmbed(p);
+        }
         default: {
             return parseExpr(p);
         }
@@ -1698,6 +1803,11 @@ void addExpr(AstExpr *expr, Parser *p) {
 void parse(Parser *p) {
     while (!isEnd(p)) {
         AstExpr *expr = parseStatement(p);
+        if (!expr) {
+            exitWithInternalCompilerError("a null expression was returned from the parser");
+            return;
+        }
+
         addExpr(expr, p);
 
         if (expr->type == AST_ERR_EXPR) break;

@@ -37,6 +37,7 @@ typedef enum {
     AST_STRUCT_INITIALIZER,
     AST_STRUCT_FIELD_INIT,
     AST_DEFER_STATEMENT,
+    AST_EMBED,
 } AstType;
 
 typedef enum {
@@ -270,6 +271,10 @@ typedef struct {
     AstExpr *statement;
 } DeferStatement;
 
+typedef struct {
+    char *embedSource;
+} EmbedStatement;
+
 struct AstExpr {
     AstType type;
 
@@ -307,6 +312,7 @@ struct AstExpr {
         StructInitializer   asStructInit;
         StructFieldInit     asStructFieldInit;
         DeferStatement      asDefer;
+        EmbedStatement      asEmbed;
     };
 };
 
@@ -342,6 +348,7 @@ AstExpr *newPropertyAccessExpr(AstExpr *object, char *property);
 AstExpr *newStructInitializer(StructFieldInit *fields, int fieldCount, int fieldCapacity);
 AstExpr *newStructFieldInit(char *name, AstExpr *value);
 AstExpr *newDeferStatement(AstExpr *expr);
+AstExpr *newEmbedStatement(char *embedSource);
 
 AstExpr *newErrExpr();
 

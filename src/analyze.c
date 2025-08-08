@@ -467,6 +467,9 @@ static void analyzeExpr(Analyzer *analyzer, AstExpr *expr) {
         case AST_STRUCT_FIELD_INIT: {
             break;
         }
+        case AST_EMBED: {
+            break;
+        }
         case AST_ERR_EXPR: {
             exitWithInternalCompilerError("found error expression in analyzer");
             break;

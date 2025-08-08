@@ -64,6 +64,7 @@ static void initKeywords(Lexer *l) {
     newKeyword(l, "enum", TOKEN_ENUM);
     newKeyword(l, "const", TOKEN_CONST);
     newKeyword(l, "defer", TOKEN_DEFER);
+    newKeyword(l, "embed", TOKEN_EMBED);
 }
 
 Lexer newLexer(char *filePath, char *source, bool debug) {
@@ -229,6 +230,7 @@ static Token tokenizeSymbol(Lexer *l) {
         case ',': return newToken(",", TOKEN_COMMA, l);
         case ';': return newToken(";", TOKEN_SEMICOLON, l);
         case '@': return newToken("@", TOKEN_AT, l);
+        case '\"': return newToken("\"", TOKEN_DOUBLE_QUOTE, l);
         case '|': {
             if (currentChar(l) == '|') {
                 advance(l);
@@ -295,7 +297,10 @@ static Token tokenizeString(Lexer *l) {
         return badToken(l);
     }
 
-    char *lexeme = copyLexeme(l, start);
+    l->position++;
+    char *lexeme = copyLexeme(l, start - 1);
+    l->position--;
+
     advance(l);
 
     return newToken(lexeme, TOKEN_STRING, l);

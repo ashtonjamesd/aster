@@ -41,6 +41,7 @@ typedef enum {
     TOKEN_RIGHT_PAREN,
     TOKEN_SEMICOLON,
     TOKEN_AT,
+    TOKEN_EMBED,
 
     TOKEN_STAR,
     TOKEN_AMPERSAND,
@@ -61,6 +62,7 @@ typedef enum {
     TOKEN_SHIFT_LEFT,
     TOKEN_SHIFT_RIGHT,
     TOKEN_DOT,
+    TOKEN_DOUBLE_QUOTE,
 
     TOKEN_INTEGER,
     TOKEN_FLOAT,

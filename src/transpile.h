@@ -6,6 +6,8 @@
 typedef struct {
     Ast   ast;
     FILE *fptr;
+
+    bool isEmittingExpression;
 } Transpiler;
 
 Transpiler newTranspiler(FILE *fptr, Ast ast);

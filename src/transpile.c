@@ -12,6 +12,8 @@ Transpiler newTranspiler(FILE *fptr, Ast ast) {
     transpiler.ast = ast;
     transpiler.fptr = fptr;
 
+    transpiler.isEmittingExpression = false;
+
     return transpiler;
 }
 
@@ -391,7 +393,7 @@ static void emitFloatLiteral(Transpiler *t, FloatLiteralExpr floatLiteral) {
 }
 
 static void emitStringLiteral(Transpiler *t, StringLiteralExpr string) {
-    fprintf(t->fptr, "\"%s\"", string.value);
+    fprintf(t->fptr, "%s", string.value);
 }
 
 static void emitCharLiteral(Transpiler *t, CharLiteralExpr charLiteral) {
@@ -469,6 +471,10 @@ static void emitCallExpr(Transpiler *t, CallExpr call) {
         }
     }
     emitRightParen(t);
+
+    if (!t->isEmittingExpression) {
+        emitSemicolon(t);
+    }
 }
 
 static void emitMatchExpression(Transpiler *t, MatchExpr match) {
@@ -591,6 +597,10 @@ static void emitDeferStatement(Transpiler *t, DeferStatement defer) {
     emitExpr(t, defer.statement);
 }
 
+static void emitEmbed(Transpiler *t, EmbedStatement embed) {
+    emit(t, embed.embedSource);
+}
+
 static void emitExpr(Transpiler *t, AstExpr *expr) {
     switch (expr->type) {
         case AST_FUNCTION_DECLARATION: {
@@ -654,7 +664,9 @@ static void emitExpr(Transpiler *t, AstExpr *expr) {
             break;
         }
         case AST_BINARY: {
+            t->isEmittingExpression = true;
             emitBinary(t, expr->asBinary);
+            t->isEmittingExpression = false;
             break;
         }
         case AST_CALL_EXPR: {
@@ -699,6 +711,10 @@ static void emitExpr(Transpiler *t, AstExpr *expr) {
         }
         case AST_STRUCT_INITIALIZER: {
             emitStructInit(t, expr->asStructInit);
+            break;
+        }
+        case AST_EMBED: {
+            emitEmbed(t, expr->asEmbed);
             break;
         }
         default: {

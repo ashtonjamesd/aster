@@ -33,12 +33,23 @@ static inline char *readFile(char *path) {
     return buff;
 }
 
+void runC() {
+    int code = system("gcc out.c -o out && ./out");
+    if (code != 0) {
+        fprintf(stderr, "compilation or execution failed\n");
+    }
+
+    system("rm out");
+    system("rm out.c");
+}
+
+
 ExecResult runFromSource(char *path) {
     char *source = readFile(path);
     if (!source) return EXEC_FAIL;
 
     AsterConfig config = {
-        .lexerDebug = false,
+        .lexerDebug = true,
         .parserDebug = true,
         .path = path
     };
@@ -46,7 +57,9 @@ ExecResult runFromSource(char *path) {
     AsterCompiler aster = newCompiler(source, config);
     ExecResult result = compileToC(&aster);
 
-    return result;
+    runC();
+
+    return EXEC_OK;
 }
 
 ExecResult runRepl() {

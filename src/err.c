@@ -91,6 +91,7 @@ void compileErrFromAnalyzer(Analyzer *analyzer, const char *format, ...) {
 }
 
 void exitWithInternalCompilerError(char *err) {
-    fprintf(stderr, "\ninternal compiler error: %s\n\n", err);
+    fprintf(stderr, "\ninternal compiler error: %s", err);
+    fprintf(stderr, "\nthis should not have happened, oops. please report this bug.\n\n");
     exit(1);
 }

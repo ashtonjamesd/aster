@@ -316,6 +316,14 @@ AstExpr *newDeferStatement(AstExpr *statement) {
     return expr;
 }
 
+AstExpr *newEmbedStatement(char *embedSource) {
+    AstExpr *expr = newExpr(AST_EMBED);
+
+    expr->asEmbed.embedSource = embedSource;
+
+    return expr;
+}
+
 AstExpr *newErrExpr() {
     AstExpr *expr = newExpr(AST_ERR_EXPR);
 

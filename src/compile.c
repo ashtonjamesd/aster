@@ -64,6 +64,8 @@ ExecResult compileToC(AsterCompiler *compiler) {
     freeLexer(&lexer);
     freeParser(&parser);
     freeAnalyzer(&analyzer);
+
+    fclose(fptr);
     
     return EXEC_OK;
 }
